@@ -1,13 +1,13 @@
 /*
- *          ::::::::  :::       :::     :::     :::::::::  :::::::::   ::::::::
- *         :+:    :+: :+:       :+:   :+: :+:   :+:    :+: :+:    :+: :+:    :+:
- *         +:+    +:+ +:+       +:+  +:+   +:+  +:+    +:+ +:+    +:+ +:+    +:+
- *         +#+    +:+ +#+  +:+  +#+ +#++:++#++: +#+    +:+ +#++:++#:  +#+    +:+
- *         +#+  # +#+ +#+ +#+#+ +#+ +#+     +#+ +#+    +#+ +#+    +#+ +#+    +#+
- *         #+#   +#+   #+#+# #+#+#  #+#     #+# #+#    #+# #+#    #+# #+#    #+#
- *          ###### ###  ###   ###   ###     ### #########  ###    ###  ########
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -25,8 +25,8 @@
 #include "qowBase.h"
 #include "qowVideo_W32.h"
 #include "qowAudio_W32.h"
-#include "../../afx/src/draw/ddi/avxImpl_Surface.h"
-//#include "../../afx/src/mix/ddi/avxImpl_Sink.h"
+#include "../qwadro_afx/src/draw/ddi/avxImpl_Surface.h"
+//#include "../qwadro_afx/src/mix/ddi/avxImpl_Sink.h"
 
 QOW afxError _QowDoutDtorCb_GDI(afxSurface dout);
 QOW afxError _QowDoutCtorCb_GDI(afxSurface dout, void** args, afxUnit invokeNo);
@@ -96,10 +96,10 @@ _QOW afxError afxIcdHook(afxModule icd, afxUri const* manifest)
     afxError err = AFX_ERR_NONE;
     AFX_ASSERT_OBJECTS(afxFcc_MDLE, 1, &icd);
 
-    afxClassConfig sesClsCfg = _AUX_SES_CLASS_CONFIG;
-    sesClsCfg.fixedSiz = sizeof(AFX_OBJ(afxSession));
-    sesClsCfg.ctor = (void*)_QowSesCtorCb;
-    sesClsCfg.dtor = (void*)_QowSesDtorCb;
+    afxClassConfig sesClsCfg = _AUX_ENV_CLASS_CONFIG;
+    sesClsCfg.fixedSiz = sizeof(AFX_OBJ(afxEnvironment));
+    sesClsCfg.ctor = (void*)_QowEnvCtorCb;
+    sesClsCfg.dtor = (void*)_QowEnvDtorCb;
 
     afxClassConfig vduClsCfg = _AVX_VDU_CLASS_CONFIG;
     vduClsCfg.fixedSiz = sizeof(AFX_OBJ(afxDisplay));

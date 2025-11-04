@@ -1,13 +1,13 @@
 /*
- *          ::::::::  :::       :::     :::     :::::::::  :::::::::   ::::::::
- *         :+:    :+: :+:       :+:   :+: :+:   :+:    :+: :+:    :+: :+:    :+:
- *         +:+    +:+ +:+       +:+  +:+   +:+  +:+    +:+ +:+    +:+ +:+    +:+
- *         +#+    +:+ +#+  +:+  +#+ +#++:++#++: +#+    +:+ +#++:++#:  +#+    +:+
- *         +#+  # +#+ +#+ +#+#+ +#+ +#+     +#+ +#+    +#+ +#+    +#+ +#+    +#+
- *         #+#   +#+   #+#+# #+#+#  #+#     #+# #+#    #+# #+#    #+# #+#    #+#
- *          ###### ###  ###   ###   ###     ### #########  ###    ###  ########
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -430,8 +430,8 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         return DefWindowProcA(hWnd, message, wParam, lParam);
     }
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
-    afxSession ses = AfxGetHost(wnd);
-    AFX_ASSERT_OBJECTS(afxFcc_SES, 1, &ses);
+    afxEnvironment env = AfxGetHost(wnd);
+    AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     if (wnd->m.redrawFrameRequested)
     {
@@ -472,7 +472,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         msg.lParam = lParam;
         msg.message = message;
         msg.wParam = wParam;
-        _QowProcessSystemInputMessageWin32(&msg, ses, wnd);  // we need this at focus loss to gain a last chance to release all keys.
+        _QowProcessSystemInputMessageWin32(&msg, env, wnd);  // we need this at focus loss to gain a last chance to release all keys.
 
         // RIM_INPUT --- Input occurred while the application was in the foreground.
         // The application must call DefWindowProc so the system can perform cleanup.
@@ -486,7 +486,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         {
             auxEvent ev = { 0 };
             ev.id = auxEventId_CURS_IN;
-            AfxEmitEvent(wnd, &ev);
+            AfxEmitEvent(wnd, &ev.ev);
 
             if (wnd->hCursor)
             {
@@ -537,7 +537,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         auxEvent ev = { 0 };
         ev.id = auxEventId_CURS_OUT;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
         // Mouse left the window; reset tracking.
         wnd->trackingMouse = FALSE;
@@ -560,7 +560,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         auxEvent ev = { 0 };
         ev.id = auxEventId_CURS_ON;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
         // Mouse hovered without moving
         //MessageBoxW(hWnd, L"Mouse hovered!", L"Info", MB_OK);
@@ -604,7 +604,8 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
             //if (!wnd->m.w32.keymenu)
                 //  return 0;
 
-            break;
+            return 0; // disable OS menu to avoid stall.
+            //break;
         }
         }
         break;
@@ -618,11 +619,11 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         auxEvent ev = { 0 };
         ev.id = auxEventId_CLOSE;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
         if (wnd->m.fullscreen)
         {
-            AfxMakeWindowExclusive(wnd, FALSE);
+            AfxTakeFullscreen(wnd, FALSE);
         }
 
         //PostQuitMessage(0); // Send A Quit Message
@@ -633,7 +634,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
     {
         auxEvent ev = { 0 };
         ev.id = auxEventId_ACTIVATE;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
         if (!HIWORD(wParam)) // Check Minimization State
         {
@@ -958,8 +959,9 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         {
 
-            afxRect cr = { 0 };
-            GetClientRect(hWnd, &cr);
+            RECT wr = { 0 };
+            GetClientRect(hWnd, &wr);
+            afxRect cr = { wr.left, wr.top, wr.right, wr.bottom };
 
             if (cr.w * cr.h) // don't set to zero
             {
@@ -970,13 +972,13 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         auxEvent ev = { 0 };
         ev.id = auxEventId_PLACEMENT;
         ev.wnd = wnd;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
 #if 0
         if (wnd->m.fullscreen)
         {
-            AfxMakeWindowExclusive(wnd, FALSE);
-            AfxMakeWindowExclusive(wnd, TRUE);
+            AfxTakeFullscreen(wnd, FALSE);
+            AfxTakeFullscreen(wnd, TRUE);
 #if 0
             RECT wr, cr;
             GetWindowRect(hwnd, &wr);
@@ -1030,7 +1032,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         auxEvent ev = { 0 };
         ev.id = auxEventId_CHANGED;
         ev.wnd = wnd;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
         break;
     }
@@ -1039,7 +1041,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         // Sent to a window after the SetWindowLong function has changed one or more of the window's styles. A window receives this message through its WindowProc function.
         // wParam = Indicates whether the window's styles or extended window styles have changed. This parameter can be one or more of the following values.
         
-        afxUnit mleft, mtop, mright, mbottom;
+        afxInt32 mleft, mtop, mright, mbottom;
         GetWindowFrameMargins(wnd->hWnd, &mleft, &mtop, &mright, &mbottom);
         wnd->m.marginL = mleft;
         wnd->m.marginT = mtop;
@@ -1049,7 +1051,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         auxEvent ev = { 0 };
         ev.id = auxEventId_STYLE;
         ev.wnd = wnd;
-        AfxEmitEvent(wnd, &ev);
+        AfxEmitEvent(wnd, &ev.ev);
 
         break;
     }
@@ -1122,17 +1124,17 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         if (wnd->m.cursHidden)
         {
             ShowCursor(TRUE);
-            ses->m.cursHidden = FALSE;
+            env->m.cursHidden = FALSE;
         }
         
         if (wnd->m.cursConfined)
         {
-            AFX_ASSERT(wnd == ses->m.cursCapturedOn);
+            AFX_ASSERT(wnd == env->m.cursCapturedOn);
             afxBool liberated = !!ClipCursor(NULL);
-            ses->m.cursCapturedOn = NIL;
+            env->m.cursCapturedOn = NIL;
         }
         
-        _AfxSesFocusWindowCb(ses, NIL, NIL);
+        _AfxEnvFocusWindowCb(env, NIL, NIL);
 
         //ShakeWindow(wnd);
 
@@ -1144,13 +1146,13 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
             msg.message = message;
             msg.lParam = lParam;
             msg.wParam = wParam;
-            _QowProcessSystemInputMessageWin32(&msg, ses, wnd);
+            _QowProcessSystemInputMessageWin32(&msg, env, wnd);
         }
         break;
     }
     case WM_SETFOCUS: // Sent to a window after it has gained the keyboard focus.
     {
-        _AfxSesFocusWindowCb(ses, wnd, NIL);
+        _AfxEnvFocusWindowCb(env, wnd, NIL);
 
         POINT cursorPos;
         if (GetCursorPos(&cursorPos))
@@ -1169,7 +1171,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
                     if (wnd->m.cursHidden)
                     {
                         ShowCursor(FALSE);
-                        ses->m.cursHidden = TRUE;
+                        env->m.cursHidden = TRUE;
                     }
                     else if (wnd->m.cursConfined)
                     {
@@ -1180,7 +1182,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
                         afxBool confined = !!ClipCursor(&cr);
 
                         if (confined)
-                            ses->m.cursCapturedOn = wnd;
+                            env->m.cursCapturedOn = wnd;
                     }
                 }
             }
@@ -1204,7 +1206,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
                 afxBool confined = !!ClipCursor(&cr);
 
                 if (confined)
-                    ses->m.curCapturedOn = wnd;
+                    env->m.curCapturedOn = wnd;
             }
             return 0;
         }
@@ -1331,7 +1333,7 @@ _QOW afxError _QowWndRedrawCb(afxWindow wnd, afxRect const* rc)
 }
 
 #if 0
-_QOW afxBool AfxTraceScreenToSurface(afxWindow wnd, afxUnit const screenPos[2], afxUnit surfPos[2])
+_QOW afxBool AfxGetOnSurfaceScreenPosition(afxWindow wnd, afxUnit const screenPos[2], afxUnit surfPos[2])
 {
     afxError err = AFX_ERR_NONE;
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
@@ -1347,7 +1349,7 @@ _QOW afxBool AfxTraceScreenToSurface(afxWindow wnd, afxUnit const screenPos[2], 
     return rslt;
 }
 
-_QOW afxBool AfxTraceSurfaceToScreen(afxWindow wnd, afxUnit const surfPos[2], afxUnit screenPos[2])
+_QOW afxBool AfxGetOnScreenSurfacePosition(afxWindow wnd, afxUnit const surfPos[2], afxUnit screenPos[2])
 {
     afxError err = AFX_ERR_NONE;
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
@@ -1488,8 +1490,8 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
     afxError err = AFX_ERR_NONE;
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
-    afxSession ses = args[0];
-    AFX_ASSERT_OBJECTS(afxFcc_SES, 1, &ses);
+    afxEnvironment env = args[0];
+    AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
     afxWindowConfig const* wcfg = (afxWindowConfig const*)(args[1]) + invokeNo;
     
     if (!wcfg)
@@ -1503,7 +1505,7 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
     widClsCfg.ctor = (void*)_QowWidCtorCb;
     widClsCfg.dtor = (void*)_QowWidDtorCb;
 
-    if (_AUX_WND_CLASS_CONFIG.ctor(wnd, (void*[]) { ses, (void*)wcfg, (void*)&widClsCfg }, 0))
+    if (_AUX_WND_CLASS_CONFIG.ctor(wnd, (void*[]) { env, (void*)wcfg, (void*)&widClsCfg }, 0))
     {
         AfxThrowError();
         return err;
@@ -1543,8 +1545,8 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
     wnd->dwExStyle = dwExStyle;
     wnd->dwStyle = dwStyle;
 
-    HWND hWnd = CreateWindowExA(dwExStyle, ses->wndClss.lpszClassName, ses->wndClss.lpszClassName, 
-                                dwStyle, wcfg->atX, wcfg->atY, 1, 1, NIL, NIL, ses->wndClss.hInstance, NIL);
+    HWND hWnd = CreateWindowExA(dwExStyle, env->wndClss.lpszClassName, env->wndClss.lpszClassName, 
+                                dwStyle, wcfg->x, wcfg->y, 1, 1, NIL, NIL, env->wndClss.hInstance, NIL);
 
     if (!hWnd) AfxThrowError();
     else
@@ -1595,15 +1597,15 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
 
         scfg.iop.endpointNotifyObj = wnd;
         scfg.iop.endpointNotifyFn = (void*)DoutNotifyOvy;
-        scfg.iop.w32.hInst = ses->wndClss.hInstance;
+        scfg.iop.w32.hInst = env->wndClss.hInstance;
         scfg.iop.w32.hWnd = hWnd;
 
-        if (AvxOpenSurface(wcfg->dsys, &scfg, &dout)) AfxThrowError();
+        if (AvxAcquireSurface(wcfg->dsys, &scfg, &dout)) AfxThrowError();
         else
         {
             wnd->m.dout = dout;
 
-            afxRect rc = { .x = wcfg->atX, .y = wcfg->atY, .w = wcfg->dout.ccfg.whd.w, .h = wcfg->dout.ccfg.whd.h };
+            afxRect rc = { .x = wcfg->x, .y = wcfg->y, .w = wcfg->dout.ccfg.whd.w, .h = wcfg->dout.ccfg.whd.h };
             rc.w = AFX_MAX(1, rc.w);;
             rc.h = AFX_MAX(1, rc.h);
             AfxAdjustWindow(wnd, &rc);

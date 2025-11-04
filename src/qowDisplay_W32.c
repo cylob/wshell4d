@@ -1,13 +1,13 @@
 ﻿/*
- *             :::::::::::     :::     :::::::::   ::::::::      :::
- *                 :+:       :+: :+:   :+:    :+: :+:    :+:   :+: :+:
- *                 +:+      +:+   +:+  +:+    +:+ +:+         +:+   +:+
- *                 +#+     +#++:++#++: +#++:++#:  :#:        +#++:++#++:
- *                 +#+     +#+     +#+ +#+    +#+ +#+   +#+# +#+     +#+
- *                 #+#     #+#     #+# #+#    #+# #+#    #+# #+#     #+#
- *                 ###     ###     ### ###    ###  ########  ###     ###
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -161,14 +161,18 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
     HDC hDc = hdcMonitor;
 
     // Width, in pixels, of the screen; or for printers, the width, in pixels, of the printable area of the page.
-    dpy->m.resWh[0] = GetDeviceCaps(hDc, HORZRES);
     // Height, in raster lines, of the screen; or for printers, the height, in pixels, of the printable area of the page.
+    dpy->m.resWh[0] = GetDeviceCaps(hDc, HORZRES);
     dpy->m.resWh[1] = GetDeviceCaps(hDc, VERTRES);
 
-    // Width, in millimeters, of the physical screen.
+    // Width and height, in millimeters, of the physical screen.
     dpy->m.dimWh[0] = GetDeviceCaps(hDc, HORZSIZE);
-    // Height, in millimeters, of the physical screen.
     dpy->m.dimWh[1] = GetDeviceCaps(hDc, VERTSIZE);
+
+    int dpiX = GetDeviceCaps(hDc, LOGPIXELSX);
+    int dpiY = GetDeviceCaps(hDc, LOGPIXELSY);
+    dpy->m.dpi[0] = dpiX;
+    dpy->m.dpi[1] = dpiY;
 
     // Number of adjacent color bits for each pixel.
     // NOTE: When nIndex is BITSPIXEL and the device has 15bpp or 16bpp, the return value is 16.
@@ -215,7 +219,7 @@ BOOL GetMonitorNameFromHMONITOR(HMONITOR hMonitor, char* outName, size_t outName
     MONITORINFOEXA targetInfo = { 0 };
     targetInfo.cbSize = sizeof(targetInfo);
 
-    if (!GetMonitorInfoA(hMonitor, &targetInfo))
+    if (!GetMonitorInfoA(hMonitor, (MONITORINFO*)&targetInfo))
         return FALSE;
 
     RECT targetRect = targetInfo.rcMonitor;
@@ -482,7 +486,7 @@ _QOW afxUnit _ZglEnumerateDisplayFormats(afxModule icd, afxUnit vdu, afxUnit cnt
         };
 
         int pxlFmt = 0;
-        int gdiPfdCnt = 0;
+        unsigned int gdiPfdCnt = 0;
         
         afxBool byWgl;
         if (wglChooseBestPixelFormatSIG(hDc, &pxlAttrPairs[0][0], NIL, 1, &pxlFmt, &gdiPfdCnt, &byWgl))
@@ -570,8 +574,8 @@ _QOW afxUnit _ZglEnumerateDisplayModes(afxModule icd, afxUnit vdu, avxFormat fmt
             { NIL, NIL },
         };
 
-        afxUnit gdiPfi[256];
-        afxUnit gdiPfdCnt = 0;
+        int gdiPfi[256];
+        unsigned int gdiPfdCnt = 0;
         if (wglChoosePixelFormatARB(hScreenDc, &pxlAttrPairs[0][0], NIL, 256, &gdiPfi, &gdiPfdCnt))
         {
             for (afxUnit j = 0; j < gdiPfdCnt; j++)
@@ -612,7 +616,7 @@ BOOL CALLBACK MonitorEnumProc2(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
     MONITORINFOEXA mon = { 0 };
     mon.cbSize = sizeof(mon);
     
-    GetMonitorInfoA(hMonitor, &mon);
+    GetMonitorInfoA(hMonitor, (MONITORINFO*)&mon);
     // Compare the HDCs to find the corresponding monitor
     //if (hdcMonitor == hdcScreen)
     {
@@ -644,14 +648,18 @@ BOOL CALLBACK MonitorEnumProc2(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
     HDC hDc = hdcMonitor;
 
     // Width, in pixels, of the screen; or for printers, the width, in pixels, of the printable area of the page.
-    dpy->m.resWh[0] = GetDeviceCaps(hDc, HORZRES);
     // Height, in raster lines, of the screen; or for printers, the height, in pixels, of the printable area of the page.
+    dpy->m.resWh[0] = GetDeviceCaps(hDc, HORZRES);
     dpy->m.resWh[1] = GetDeviceCaps(hDc, VERTRES);
 
-    // Width, in millimeters, of the physical screen.
+    // Width and height, in millimeters, of the physical screen.
     dpy->m.dimWh[0] = GetDeviceCaps(hDc, HORZSIZE);
-    // Height, in millimeters, of the physical screen.
     dpy->m.dimWh[1] = GetDeviceCaps(hDc, VERTSIZE);
+
+    int dpiX = GetDeviceCaps(hDc, LOGPIXELSX);
+    int dpiY = GetDeviceCaps(hDc, LOGPIXELSY);
+    dpy->m.dpi[0] = dpiX;
+    dpy->m.dpi[1] = dpiY;
 
     // Number of adjacent color bits for each pixel.
     // NOTE: When nIndex is BITSPIXEL and the device has 15bpp or 16bpp, the return value is 16.
@@ -767,7 +775,7 @@ _QOW afxError _ZglVduCtorCb(afxDisplay vdu, void** args, afxUnit invokeNo)
 
 BOOL CALLBACK MonitorEnumProc3(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData)
 {
-    afxDisplay dpy = (afxDrawDevice)dwData;
+    afxDisplay dpy = (afxDisplay)dwData;
 
     MONITORINFOEXA mon = { 0 };
     mon.cbSize = sizeof(mon);
@@ -906,14 +914,72 @@ afxError RegisterPresentVdus(afxModule icd)
                 HDC hDc = CreateDCA("DISPLAY", dd.DeviceName, 0, NIL);
 
                 // Width, in pixels, of the screen; or for printers, the width, in pixels, of the printable area of the page.
-                dpy->m.resWh[0] = GetDeviceCaps(hDc, HORZRES);
                 // Height, in raster lines, of the screen; or for printers, the height, in pixels, of the printable area of the page.
+                dpy->m.resWh[0] = GetDeviceCaps(hDc, HORZRES);
                 dpy->m.resWh[1] = GetDeviceCaps(hDc, VERTRES);
 
-                // Width, in millimeters, of the physical screen.
+                // Width and height, in millimeters, of the physical screen.
                 dpy->m.dimWh[0] = GetDeviceCaps(hDc, HORZSIZE);
-                // Height, in millimeters, of the physical screen.
                 dpy->m.dimWh[1] = GetDeviceCaps(hDc, VERTSIZE);
+
+                int dpiX = GetDeviceCaps(hDc, LOGPIXELSX);
+                int dpiY = GetDeviceCaps(hDc, LOGPIXELSY);
+                dpy->m.dpi[0] = dpiX;
+                dpy->m.dpi[1] = dpiY;
+
+                {
+                    /*
+                        On Windows 7, monitor DPI is not actually distinct between monitors. Even though we can
+                        enumerate monitors with EnumDisplayMonitors(), get the monitor a window is on with MonitorFromWindow(),
+                        get display settings per monitor with EnumDisplaySettings() or GetDeviceCaps(),
+                        we still get the same DPI for all monitors unless we read EDID or registry hacks.
+                        Microshit do it intentionally.
+
+                        But we are pirates! And we will not surrender to it humiliation.
+                        We can get the physical size of a monitor and its resolution, and then calculate the physical DPI ourself.
+
+                        HMONITOR hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                        MONITORINFOEX mi = { sizeof(mi) };
+                        GetMonitorInfo(hMonitor, &mi);
+                        DEVMODE devMode = { 0 };
+                        devMode.dmSize = sizeof(devMode);
+                        EnumDisplaySettings(mi.szDevice, ENUM_CURRENT_SETTINGS, &devMode);
+                        
+                        Now we have devMode.dmPelsWidth and devMode.dmPelsHeight.
+                        Now we need to get the physical size of the monitor. This is the hard part; Win32 does not give us this directly.
+
+                        If hdc is NULL, this gives us the screen size in millimeters (as reported by the display driver).
+                        int widthMM = GetDeviceCaps(hdc, HORZSIZE);
+                        int heightMM = GetDeviceCaps(hdc, VERTSIZE);
+
+                        Then calculate DPI:
+                        float dpiX = devMode.dmPelsWidth / (widthMM / 25.4f); // 25.4 mm per inch
+                        float dpiY = devMode.dmPelsHeight / (heightMM / 25.4f);
+
+                        BUT: this data is often inaccurate or faked by drivers or WDDM as this part of API is highly virtualized.
+                        The OS may report 96 DPI regardless of the real hardware.
+
+                        We can compute "per-monitor DPI" manually on Windows 7 but it's an approximation.
+                        We are reverse-engineering what GetDpiForMonitor() does.
+                        It can work, but it relies on accurate data from OS, which is not guaranteed.
+
+                        Windows 7 itself does not use or expose this data for DPI scaling, so even if we do the math, our app is working independently of the OS DPI system.
+                    */
+                    float dpiX = dpy->m.resWh[0] / (dpy->m.dimWh[0] / 25.4f); // 25.4 mm per inch
+                    float dpiY = dpy->m.resWh[1] / (dpy->m.dimWh[1] / 25.4f);
+
+                    /*
+                        Windows often reports 96 DPI by default, regardless of the actual physical DPI. 
+                        This is known as logical DPI, and it’s part of how Windows scales text and UI elements. 
+                        It doesn't mean our monitor is actually 96 DPI.
+
+                        Just don't expect Windows to match it, because 96 DPI is a UI convention, not a measurement.
+                    */
+#if 0
+                    AFX_ASSERT(dpy->m.dpi[0] == (afxUnit)dpiX);
+                    AFX_ASSERT(dpy->m.dpi[1] == (afxUnit)dpiY);
+#endif
+                }
 
                 // Number of adjacent color bits for each pixel.
                 // NOTE: When nIndex is BITSPIXEL and the device has 15bpp or 16bpp, the return value is 16.

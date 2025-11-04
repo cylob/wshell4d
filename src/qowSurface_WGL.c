@@ -1,13 +1,13 @@
 /*
- *             :::::::::::     :::     :::::::::   ::::::::      :::
- *                 :+:       :+: :+:   :+:    :+: :+:    :+:   :+: :+:
- *                 +:+      +:+   +:+  +:+    +:+ +:+         +:+   +:+
- *                 +#+     +#++:++#++: +#++:++#:  :#:        +#++:++#++:
- *                 +#+     +#+     +#+ +#+    +#+ +#+   +#+# +#+     +#+
- *                 #+#     #+#     #+# #+#    #+# #+#    #+# #+#     #+#
- *                 ###     ###     ### ###    ###  ########  ###     ###
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -78,7 +78,7 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 
     glVmt const* gl = dout->wgl.gl;
 
-    afxRect rc;
+    afxLayeredRect rc;
     avxRaster buf;
     avxCanvas canv;
     AvxGetSurfaceBuffer(dout, bufIdx, &buf);
@@ -125,12 +125,20 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
         gl->Clear(clearBitmask);  _ZglThrowErrorOccuried();
         //gl->ClearBufferfv(GL_COLOR, /*GL_DRAW_BUFFER0 +*/ 0, AFX_V4D_ZERO); _ZglThrowErrorOccuried();
 
-        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.w : 0;
-        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.h : 0;
-        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.w;
-        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.h;
+        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.area.w : 0;
+        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.area.h : 0;
+        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.area.w;
+        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.area.h;
 
-        gl->BlitFramebuffer(0, 0, rc.w, rc.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        if (dout->m.presentTransform & avxVideoTransform_TRANSPOSE)
+        {
+            // See y, x, h, w instaed of x, y, w, h.
+            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, y, x, h, w, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        }
+        else
+        {
+            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        }
         //gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
         //gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
         //gl->Flush();
@@ -195,7 +203,7 @@ _QOW afxError _DpuPresentDout_BlitSwapFbo(zglDpu* dpu, avxPresentation* ctrl)
 
     glVmt const* gl = dpu->gl;
 
-    afxRect rc;
+    afxLayeredRect rc;
     avxRaster buf;
     avxCanvas canv;
     AvxGetSurfaceBuffer(dout, bufIdx, &buf);
@@ -242,12 +250,20 @@ _QOW afxError _DpuPresentDout_BlitSwapFbo(zglDpu* dpu, avxPresentation* ctrl)
         gl->Clear(clearBitmask);  _ZglThrowErrorOccuried();
         //gl->ClearBufferfv(GL_COLOR, /*GL_DRAW_BUFFER0 +*/ 0, AFX_V4D_ZERO); _ZglThrowErrorOccuried();
 
-        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.w : 0;
-        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.h : 0;
-        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.w;
-        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.h;
+        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.area.w : 0;
+        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.area.h : 0;
+        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.area.w;
+        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.area.h;
 
-        gl->BlitFramebuffer(0, 0, rc.w, rc.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        if (dout->m.presentTransform & avxVideoTransform_TRANSPOSE)
+        {
+            // See y, x, h, w instaed of x, y, w, h.
+            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, y, x, h, w, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        }
+        else
+        {
+            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        }
         //gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried();
         //gl->Flush(); _ZglThrowErrorOccuried(); // flush is presenting/swapping
 
@@ -302,7 +318,7 @@ _QOW afxError _DpuPresentDout_BlitSwapFbo(zglDpu* dpu, avxPresentation* ctrl)
     }
 
     //dout->m.presentingBufIdx = (afxAtom32)AFX_INVALID_INDEX;
-    --dout->m.buffers[ctrl->bufIdx].locked;
+    --dout->m.swaps[ctrl->bufIdx].locked;
     AfxPushInterlockedQueue(&dout->m.freeBuffers, (afxUnit[]) { ctrl->bufIdx });
 
     //AfxYield();
@@ -337,7 +353,7 @@ _QOW afxError _DpuPresentDout_BlitRas(zglDpu* dpu, afxSurface dout, afxUnit bufI
 
     glVmt const* gl = dpu->gl;
 
-    afxRect rc;
+    afxLayeredRect rc;
     avxRaster buf;
     avxCanvas canv;
     AvxGetSurfaceBuffer(dout, bufIdx, &buf);
@@ -414,12 +430,20 @@ _QOW afxError _DpuPresentDout_BlitRas(zglDpu* dpu, afxSurface dout, afxUnit bufI
         gl->Clear(clearBitmask);  _ZglThrowErrorOccuried();
         //gl->ClearBufferfv(GL_COLOR, /*GL_DRAW_BUFFER0 +*/ 0, AFX_V4D_ZERO); _ZglThrowErrorOccuried();
 
-        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.w : 0;
-        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.h : 0;
-        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.w;
-        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.h;
+        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.area.w : 0;
+        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.area.h : 0;
+        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.area.w;
+        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.area.h;
 
-        gl->BlitFramebuffer(0, 0, rc.w, rc.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        if (dout->m.presentTransform & avxVideoTransform_TRANSPOSE)
+        {
+            // See y, x, h, w instaed of x, y, w, h.
+            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, y, x, h, w, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        }
+        else
+        {
+            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        }
         //gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried();
         //gl->Flush(); _ZglThrowErrorOccuried(); // flush is presenting/swapping
 #endif
@@ -529,7 +553,7 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
 
         if (dout->wgl.swaps)
         {
-            for (afxUnit i = 0; i < dout->m.bufCnt; i++)
+            for (afxUnit i = 0; i < dout->m.swapCnt; i++)
             {
                 if (dout->wgl.swaps[i].swapFbo)
                 {
@@ -893,7 +917,7 @@ _QOW afxError _ZglDoutAdjust_WGL(afxSurface dout, afxRect const* area, afxBool f
     _AvxDoutImplAdjustCb(dout, area, fse);
 
     if (dout->wgl.swaps)
-        for (afxUnit i = 0; i < dout->m.bufCnt; i++)
+        for (afxUnit i = 0; i < dout->m.swapCnt; i++)
             dout->wgl.swaps[i].swapFboReady = FALSE;
 
     return err;
@@ -991,10 +1015,10 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
     dout->wgl.swapOnWgl = TRUE;
     dout->wgl.swaps = NIL;
     
-    if (AfxAllocate(dout->m.bufCnt * sizeof(dout->wgl.swaps[0]), 0, AfxHere(), (void**)&dout->wgl.swaps))
+    if (AfxAllocate(dout->m.swapCnt * sizeof(dout->wgl.swaps[0]), 0, AfxHere(), (void**)&dout->wgl.swaps))
         AfxThrowError();
 
-    for (afxUnit i = 0; i < dout->m.bufCnt; i++)
+    for (afxUnit i = 0; i < dout->m.swapCnt; i++)
     {
         dout->wgl.swaps[i].swapFbo = NIL;
         dout->wgl.swaps[i].swapFboReady = FALSE;

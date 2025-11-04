@@ -1,13 +1,13 @@
 /*
- *             :::::::::::     :::     :::::::::   ::::::::      :::
- *                 :+:       :+: :+:   :+:    :+: :+:    :+:   :+: :+:
- *                 +:+      +:+   +:+  +:+    +:+ +:+         +:+   +:+
- *                 +#+     +#++:++#++: +#++:++#:  :#:        +#++:++#++:
- *                 +#+     +#+     +#+ +#+    +#+ +#+   +#+# +#+     +#+
- *                 #+#     #+#     #+# #+#    #+# #+#    #+# #+#     #+#
- *                 ###     ###     ### ###    ###  ########  ###     ###
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -59,7 +59,7 @@ _QOW afxError _QowDoutPresentCb_GDI(afxDrawQueue dque, avxPresentation* ctrl)
 
     //AFX_ASSERT(dout->m.lastPresentedBufIdx == bufIdx); // must be called by _AvxDoutPresent() to handle sync.
 
-    afxRect rc;
+    afxLayeredRect rc;
     avxRaster buf;
     avxCanvas canv;
     AvxGetSurfaceBuffer(dout, bufIdx, &buf);
@@ -70,7 +70,7 @@ _QOW afxError _QowDoutPresentCb_GDI(afxDrawQueue dque, avxPresentation* ctrl)
     if (dout->gdi.swaps[bufIdx].memDC)
     {
         // render into framebuffer
-        BitBlt(dout->hDC, 0, 0, rc.w, rc.h, dout->gdi.swaps[bufIdx].memDC, 0, 0, SRCCOPY);
+        BitBlt(dout->hDC, 0, 0, rc.area.w, rc.area.h, dout->gdi.swaps[bufIdx].memDC, 0, 0, SRCCOPY);
 
         if (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE))
         {
@@ -209,7 +209,7 @@ _QOW afxError _QowDoutRegenerateCb_GDI(afxSurface dout, afxBool build)
     if (!dout->gdi.swaps)
         return err;
 
-    for (afxUnit i = 0; i < dout->m.bufCnt; i++)
+    for (afxUnit i = 0; i < dout->m.swapCnt; i++)
     {
         if (dout->gdi.swaps[i].memDC)
         {
@@ -418,10 +418,10 @@ _QOW afxError _QowDoutCtorCb_GDI(afxSurface dout, void** args, afxUnit invokeNo)
     dout->dcPixFmt = 0;
     dout->isWpp = FALSE;
 
-    if (AfxAllocate(dout->m.bufCnt * sizeof(dout->gdi.swaps[0]), 0, AfxHere(), (void**)&dout->gdi.swaps))
+    if (AfxAllocate(dout->m.swapCnt * sizeof(dout->gdi.swaps[0]), 0, AfxHere(), (void**)&dout->gdi.swaps))
         AfxThrowError();
 
-    for (afxUnit i = 0; i < dout->m.bufCnt; i++)
+    for (afxUnit i = 0; i < dout->m.swapCnt; i++)
     {
         dout->gdi.swaps[i].memDC = NULL;
         dout->gdi.swaps[i].hBitmap = NULL;

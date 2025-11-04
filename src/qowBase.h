@@ -1,13 +1,13 @@
 /*
- *          ::::::::  :::       :::     :::     :::::::::  :::::::::   ::::::::
- *         :+:    :+: :+:       :+:   :+: :+:   :+:    :+: :+:    :+: :+:    :+:
- *         +:+    +:+ +:+       +:+  +:+   +:+  +:+    +:+ +:+    +:+ +:+    +:+
- *         +#+    +:+ +#+  +:+  +#+ +#++:++#++: +#+    +:+ +#++:++#:  +#+    +:+
- *         +#+  # +#+ +#+ +#+#+ +#+ +#+     +#+ +#+    +#+ +#+    +#+ +#+    +#+
- *         #+#   +#+   #+#+# #+#+#  #+#     #+# #+#    #+# #+#    #+# #+#    #+#
- *          ###### ###  ###   ###   ###     ### #########  ###    ###  ########
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -44,8 +44,8 @@
 
 #define _AUX_UX_C
 #define _AUX_SHELL_C
-#define _AUX_SESSION_C
-#define _AUX_SESSION_IMPL
+#define _AUX_ENVIRONMENT_C
+#define _AUX_ENVIRONMENT_IMPL
 #define _AUX_WINDOW_C
 #define _AUX_WINDOW_IMPL
 #define _AUX_WIDGET_C
@@ -54,7 +54,7 @@
 #define _AUX_HID_C
 #define _AUX_HID_IMPL
 
-#include "afx/src/ux/impl/auxImplementation.h"
+#include "../qwadro_afx/src/ux/impl/auxImplementation.h"
 
 #ifndef AUX_DRV_SRC
 #   ifdef _DEBUG
@@ -80,10 +80,10 @@
 
 //#define QOW_PLUGIN_ID AFX_MAKE_FCC('q', 'o', 'w', '\0')
 
-#ifdef _AUX_SESSION_C
-AFX_OBJECT(afxSession)
+#ifdef _AUX_ENVIRONMENT_C
+AFX_OBJECT(afxEnvironment)
 {
-    AFX_OBJ(_auxSession)    m;
+    AFX_OBJ(_auxEnvironment)    m;
     WNDCLASSEX              wndClss;
 };
 #endif
@@ -129,19 +129,16 @@ AFX_OBJECT(afxWidget)
 #endif
 
 QOW afxKey const _win32VkToQwadro[256];
-QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxSession ses, afxWindow wnd);
+QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxEnvironment env, afxWindow wnd);
 
-QOW afxError _QowSesCtorCb(afxSession ses, void** args, afxUnit invokeNo);
-QOW afxError _QowSesDtorCb(afxSession ses);
+QOW afxError _QowEnvCtorCb(afxEnvironment env, void** args, afxUnit invokeNo);
+QOW afxError _QowEnvDtorCb(afxEnvironment env);
 
 QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo);
 QOW afxError _QowWndDtorCb(afxWindow wnd);
 
 QOW afxError _QowWidCtorCb(afxWidget wid, void** args, afxUnit invokeNo);
 QOW afxError _QowWidDtorCb(afxWidget wid);
-
-QOW afxError _QowSesCtorCb(afxSession ses, void** args, afxUnit invokeNo);
-QOW afxError _QowSesDtorCb(afxSession ses);
 
 QOW afxBool _QowPlaceFseSurfaceW32(HWND hwnd);
 

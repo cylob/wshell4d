@@ -1,13 +1,13 @@
 /*
- *          ::::::::  :::       :::     :::     :::::::::  :::::::::   ::::::::
- *         :+:    :+: :+:       :+:   :+: :+:   :+:    :+: :+:    :+: :+:    :+:
- *         +:+    +:+ +:+       +:+  +:+   +:+  +:+    +:+ +:+    +:+ +:+    +:+
- *         +#+    +:+ +#+  +:+  +#+ +#++:++#++: +#+    +:+ +#++:++#:  +#+    +:+
- *         +#+  # +#+ +#+ +#+#+ +#+ +#+     +#+ +#+    +#+ +#+    +#+ +#+    +#+
- *         #+#   +#+   #+#+# #+#+#  #+#     #+# #+#    #+# #+#    #+# #+#    #+#
- *          ###### ###  ###   ###   ###     ### #########  ###    ###  ########
+ *           ::::::::    :::::::::::    ::::::::    ::::     ::::       :::
+ *          :+:    :+:       :+:       :+:    :+:   +:+:+: :+:+:+     :+: :+:
+ *          +:+              +:+       +:+          +:+ +:+:+ +:+    +:+   +:+
+ *          +#++:++#++       +#+       :#:          +#+  +:+  +#+   +#++:++#++:
+ *                 +#+       +#+       +#+   +#+#   +#+       +#+   +#+     +#+
+ *          #+#    #+#       #+#       #+#    #+#   #+#       #+#   #+#     #+#
+ *           ########    ###########    ########    ###       ###   ###     ###
  *
- *                  Q W A D R O   E X E C U T I O N   E C O S Y S T E M
+ *                     S I G M A   T E C H N O L O G Y   G R O U P
  *
  *                                   Public Test Build
  *                               (c) 2017 SIGMA FEDERATION
@@ -362,7 +362,7 @@ _QOW afxKey const _win32VkToQwadro[256] =
     NIL, // VK_OEM_CLEAR	0xFE	Clear key
 };
 
-_QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxSession ses, afxWindow wnd)
+_QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxEnvironment env, afxWindow wnd)
 {
     afxError err = AFX_ERR_NONE;
     afxByte bytes[4096] = { 0 };
@@ -372,11 +372,11 @@ _QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxSession ses, afxW
     if (!wnd)
         wnd = (afxWindow)(GetWindowLongPtr(msg->hwnd, GWLP_USERDATA));
 
-    if (!ses && wnd)
+    if (!env && wnd)
     {
         AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
-        ses = AfxGetHost(wnd);
-        AFX_ASSERT_OBJECTS(afxFcc_SES, 1, &ses);
+        env = AfxGetHost(wnd);
+        AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
     }
 
     if (msg->message == WM_INPUT_DEVICE_CHANGE)
