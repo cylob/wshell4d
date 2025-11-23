@@ -25,7 +25,7 @@
 #include "qowBase.h"
 #include "qowVideo_W32.h"
 #include "qowAudio_W32.h"
-#include "../qwadro_afx/src/draw/ddi/avxImpl_Surface.h"
+#include "../qwadro_afx/src/draw/avxSurfaceImpl.h"
 //#include "../qwadro_afx/src/mix/ddi/avxImpl_Sink.h"
 
 QOW afxError _QowDoutDtorCb_GDI(afxSurface dout);
@@ -36,7 +36,7 @@ QOW afxError _ZglDoutDtorCb(afxSurface dout);
 
 afxError getInteropDoutCls(afxDrawSystem dsys, afxString const* tool, afxClassConfig* cfg)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     if (0 == AfxCompareString(tool, 0, "wgl", 0, FALSE))
     {
@@ -69,7 +69,7 @@ afxError getInteropDoutCls(afxDrawSystem dsys, afxString const* tool, afxClassCo
 
 afxError getInteropSinkCls(afxMixSystem msys, afxString const* tool, afxClassConfig* cfg)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     if ((0 == AfxCompareString(tool, 0, "w32", 0, FALSE)) ||
         (0 == AfxCompareString(tool, 0, "wasapi", 0, FALSE)) ||
@@ -93,7 +93,7 @@ afxError getInteropSinkCls(afxMixSystem msys, afxString const* tool, afxClassCon
 
 _QOW afxError afxIcdHook(afxModule icd, afxUri const* manifest)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_MDLE, 1, &icd);
 
     afxClassConfig sesClsCfg = _AUX_ENV_CLASS_CONFIG;
@@ -106,7 +106,7 @@ _QOW afxError afxIcdHook(afxModule icd, afxUri const* manifest)
     vduClsCfg.ctor = (void*)_ZglVduCtorCb;
     vduClsCfg.dtor = (void*)_ZglVduDtorCb;
 
-    _afxShellImplementation impl = { 0 };
+    _afxShellImpl impl = { 0 };
     impl.vduCls = vduClsCfg;
     impl.sesCls = sesClsCfg;
     impl.getInteropDoutCls = getInteropDoutCls;

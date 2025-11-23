@@ -20,7 +20,7 @@
 
 _QOW afxError _QowAsioLockCb(afxSink asi, afxUnit64 timeout, afxUnit minFrameCnt, amxBufferedTrack* room)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
 
     afxUnit paddingFrameCnt, bufFrameCnt;
@@ -36,7 +36,7 @@ _QOW afxError _QowAsioLockCb(afxSink asi, afxUnit64 timeout, afxUnit minFrameCnt
 
 _QOW afxError _QowAsioUnlockCb(afxSink asi, afxFlags flags)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
 #if 0
     amxAudioIo op = { 0 };
@@ -54,7 +54,7 @@ _QOW afxError _QowAsioUnlockCb(afxSink asi, afxFlags flags)
 
 _QOW void _QowAsioFlushCb(afxSink asi)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
 
     afxUnit paddingFrameCnt, bufFrameCnt;
@@ -96,7 +96,7 @@ _QOW void _QowAsioFlushCb(afxSink asi)
 
 _QOW afxError _QowAsioDtorCb(afxSink asi)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
 
     afxMixDevice sdev = AfxGetHost(asi);

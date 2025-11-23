@@ -94,6 +94,8 @@
       <AdditionalIncludeDirectories>$(SolutionDir)..\;$(SolutionDir)..\..\;$(ProjectDir)..\..\;$(ProjectDir)..\..\..\;$(ProjectDir)..\..\..\qwadro;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>-msse4.2 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -108,7 +110,8 @@
       <PreprocessorDefinitions>AUX_DRV_SRC;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)..\;$(SolutionDir)..\..\;$(ProjectDir)..\..\;$(ProjectDir)..\..\..\;$(ProjectDir)..\..\..\qwadro;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>-msse4.2 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,6 +132,8 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-msse4.2 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -150,7 +155,8 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
-      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>-msse4.2 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -182,6 +188,12 @@
     <ClCompile Include="..\..\src\qowDisplay_W32.c" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\icd_amiga\_vs17\e2amiga\e2amiga.vcxproj">
+      <Project>{8f03fe4a-aa74-4cfd-a703-c3460e7fa54f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\icd_tarzgl4\_vs17\e2tarzgl4\e2tarzgl4.vcxproj">
+      <Project>{1bafd2ad-9548-4fa9-b268-6afe5087845d}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\qwadro_afx\_vs17\e2coree\e2coree.vcxproj">
       <Project>{973a60ff-ea6c-4d62-a302-bf610cabab8c}</Project>
     </ProjectReference>

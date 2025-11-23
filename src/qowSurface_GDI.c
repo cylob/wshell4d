@@ -21,7 +21,7 @@
 
 _QOW afxUnit _QowDoutIsSuspended(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     AfxLockFutex(&dout->m.suspendSlock, TRUE);
     afxUnit suspendCnt = dout->m.suspendCnt;
@@ -31,7 +31,7 @@ _QOW afxUnit _QowDoutIsSuspended(afxSurface dout)
 
 _QOW afxUnit _QowDoutSuspendFunction(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     AfxLockFutex(&dout->m.suspendSlock, FALSE);
     afxUnit suspendCnt = ++dout->m.suspendCnt;
@@ -41,7 +41,7 @@ _QOW afxUnit _QowDoutSuspendFunction(afxSurface dout)
 
 _QOW afxUnit _QowDoutResumeFunction(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     AfxLockFutex(&dout->m.suspendSlock, FALSE);
     afxUnit suspendCnt = --dout->m.suspendCnt;
@@ -51,7 +51,7 @@ _QOW afxUnit _QowDoutResumeFunction(afxSurface dout)
 
 _QOW afxError _QowDoutPresentCb_GDI(afxDrawQueue dque, avxPresentation* ctrl)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     afxSurface dout = ctrl->dout;
     afxUnit bufIdx = ctrl->bufIdx;
@@ -195,7 +195,7 @@ _QOW afxBool _QowPlaceFseSurfaceW32(HWND hwnd)
 
 _QOW afxError _QowDoutAdjustCb_GDI(afxSurface dout, afxRect const* area, afxBool fse)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     _AvxDoutImplAdjustCb(dout, area, fse);
 
@@ -204,7 +204,7 @@ _QOW afxError _QowDoutAdjustCb_GDI(afxSurface dout, afxRect const* area, afxBool
 
 _QOW afxError _QowDoutRegenerateCb_GDI(afxSurface dout, afxBool build)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     if (!dout->gdi.swaps)
         return err;
@@ -255,7 +255,7 @@ _QOW afxError _QowDoutRegenerateCb_GDI(afxSurface dout, afxBool build)
 
 _QOW afxError _QowRelinkDoutCb_GDI(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     afxDrawSystem dsys = AvxGetSurfaceHost(dout);
@@ -325,18 +325,18 @@ _QOW afxError _QowRelinkDoutCb_GDI(afxSurface dout)
     afxReal64 physAspRatio = (afxReal64)GetDeviceCaps(dout->hDC, HORZSIZE) / (afxReal64)GetDeviceCaps(dout->hDC, VERTSIZE);
     afxReal refreshRate = GetDeviceCaps(dout->hDC, VREFRESH);
     avxModeSetting mode = { 0 };
-    AvxQuerySurfaceSettings(dout, &mode);
+    AvxQuerySurfaceMode(dout, &mode);
     mode.refreshRate = refreshRate;
     mode.wpOverHp = physAspRatio;
     mode.resolution = screenRes;
-    AvxChangeSurfaceSettings(dout, &mode);
+    AvxResetSurfaceMode(dout, &mode);
 
     return err;
 }
 
 _QOW afxError _QowDoutIoctlCb_GDI(afxSurface dout, afxUnit code, va_list ap)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     switch (code)
@@ -356,19 +356,19 @@ _QOW afxError _QowDoutIoctlCb_GDI(afxSurface dout, afxUnit code, va_list ap)
     return err;
 }
 
-_QOW _avxDoutDdi const _QOW_DOUT_DDI =
+_QOW _avxDdiDout const _QOW_DDI_DOUT =
 {
     .ioctlCb = _QowDoutIoctlCb_GDI,
     .adjustCb = _QowDoutAdjustCb_GDI,
-    .lockCb = NIL,
-    .unlockCb = NIL,
+    .lockCb = _AvxDoutImplLockBufferCb,
+    .unlockCb = _AvxDoutImplUnlockBufferCb,
     .presentCb = _QowDoutPresentCb_GDI,
     .regenCb = _QowDoutRegenerateCb_GDI
 };
 
 _QOW afxError _QowDoutDtorCb_GDI(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     _QowDoutSuspendFunction(dout);
@@ -396,7 +396,7 @@ _QOW afxError _QowDoutDtorCb_GDI(afxSurface dout)
 
 _QOW afxError _QowDoutCtorCb_GDI(afxSurface dout, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     afxDrawSystem dsys = args[0];
@@ -410,7 +410,7 @@ _QOW afxError _QowDoutCtorCb_GDI(afxSurface dout, void** args, afxUnit invokeNo)
         return err;
     }
 
-    dout->m.pimpl = &_QOW_DOUT_DDI;
+    dout->m.ddi = &_QOW_DDI_DOUT;
 
     dout->hInst = cfg->iop.w32.hInst;
     dout->hWnd = cfg->iop.w32.hWnd;

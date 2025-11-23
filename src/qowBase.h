@@ -54,7 +54,10 @@
 #define _AUX_HID_C
 #define _AUX_HID_IMPL
 
-#include "../qwadro_afx/src/ux/impl/auxImplementation.h"
+#define _AVX_DISPLAY_C
+#define _AVX_DISPLAY_IMPL
+
+#include "../qwadro_afx/src/ux/auxIcd.h"
 
 #ifndef AUX_DRV_SRC
 #   ifdef _DEBUG

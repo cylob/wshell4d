@@ -52,8 +52,10 @@ _QOW HWND FindShellBackgroundWindowW32(void)
 
 _QOW afxError _QowEnvDrawBgCb(afxEnvironment env, afxDrawContext dctx, afxFlags flags)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
+
+    // TODO: Pass a canvas or surface to be copied?
 
     if (env->m.dsys)
     {
@@ -69,7 +71,7 @@ _QOW afxError _QowEnvDrawBgCb(afxEnvironment env, afxDrawContext dctx, afxFlags 
 
 _QOW afxTime _QowEnvPump(afxEnvironment env, afxFlags flags, afxTime timeout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     //afxTime timeout = 0;
@@ -168,7 +170,7 @@ _QOW afxTime _QowEnvPump(afxEnvironment env, afxFlags flags, afxTime timeout)
 
 _QOW afxBool AfxConfineCursor(afxWindow wnd)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     afxSystem sys;
     AfxGetSystem(&sys);
     AFX_ASSERT_OBJECTS(afxFcc_SYS, 1, &sys);
@@ -195,7 +197,7 @@ _QOW afxBool AfxConfineCursor(afxWindow wnd)
 
 _QOW afxBool AfxLiberateCursor(afxWindow wnd)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     afxSystem sys;
     AfxGetSystem(&sys);
     AFX_ASSERT_OBJECTS(afxFcc_SYS, 1, &sys);
@@ -209,7 +211,7 @@ _QOW afxBool AfxLiberateCursor(afxWindow wnd)
 
 _QOW afxBool AfxIsCursorOnSurface(afxWindow wnd)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     afxSystem sys;
     AfxGetSystem(&sys);
     AFX_ASSERT_OBJECTS(afxFcc_SYS, 1, &sys);
@@ -235,7 +237,7 @@ _QOW afxBool AfxIsCursorOnSurface(afxWindow wnd)
 
 _QOW afxError CopyIntoClipboard(afxEnvironment env, afxUnit slot, afxFlags flags, afxString const* text)
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     if (!OpenClipboard(NIL))
@@ -268,7 +270,7 @@ _QOW afxError CopyIntoClipboard(afxEnvironment env, afxUnit slot, afxFlags flags
 
 _QOW afxBool HasClipboardContent(afxEnvironment env, afxUnit slot, afxFlags flags)
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     if (!IsClipboardFormatAvailable(CF_UNICODETEXT))
@@ -280,7 +282,7 @@ _QOW afxBool HasClipboardContent(afxEnvironment env, afxUnit slot, afxFlags flag
 
 _QOW afxError CopyOutClipboard(afxEnvironment env, afxUnit slot, afxFlags flags, afxString* buf)
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     if (!IsClipboardFormatAvailable(CF_UNICODETEXT))
@@ -331,7 +333,7 @@ _QOW void setMousePosition(afxEnvironment env, afxWindow wnd, afxInt const posit
 
 _QOW afxBool _QowGetFocusedWindow(afxEnvironment env, afxWindow* window)
 {
-    afxError err = 0;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
     afxWindow wnd = env->m.focusedWnd;
     HWND hWndFocused = GetForegroundWindow();
@@ -352,7 +354,7 @@ _QOW afxBool _QowGetFocusedWindow(afxEnvironment env, afxWindow* window)
 
 _QOW afxError _QowPromoteWindow(afxEnvironment env, afxWindow wnd)
 {
-    afxError err = 0;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     // Win32: We can only promote windows in same process.
@@ -442,7 +444,7 @@ void setTracking(afxWindow wnd, afxBool track)
 
 afxError grabCursor(afxEnvironment env, afxWindow wnd, afxBool grabbed)
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     if (grabbed)
@@ -463,7 +465,7 @@ afxError grabCursor(afxEnvironment env, afxWindow wnd, afxBool grabbed)
 
 _QOW afxError immergeWindow(afxEnvironment env, afxWindow wnd, afxBool fullscreen)
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     if (wnd)
@@ -565,7 +567,7 @@ _QOW afxError immergeWindow(afxEnvironment env, afxWindow wnd, afxBool fullscree
     return err;
 }
 
-_QOW _auxEnvImpl const _QOW_ENV_IMPL =
+_QOW _auxDdiEnv const _QOW_DDI_ENV =
 {
     .pumpCb = (void*)_QowEnvPump,
     .getClipboardCb = (void*)CopyOutClipboard,
@@ -579,7 +581,7 @@ _QOW _auxEnvImpl const _QOW_ENV_IMPL =
 
 _QOW afxError _QowEnvDtorCb(afxEnvironment env)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(env));
@@ -625,15 +627,15 @@ _QOW afxError _QowEnvDtorCb(afxEnvironment env)
 
 _QOW afxError _QowEnvCtorCb(afxEnvironment env, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ENV, 1, &env);
 
     afxModule icd = args[0];
     AFX_ASSERT_OBJECTS(afxFcc_MDLE, 1, &icd);
-    _auxEnvAcquisition const* cfg = AFX_CAST(_auxEnvAcquisition const*, args[1]) + invokeNo;
+    _auxEnvAcq const* cfg = AFX_CAST(_auxEnvAcq const*, args[1]) + invokeNo;
     AFX_ASSERT(cfg);
     
-    _auxEnvAcquisition cfg2 = { 0 };
+    _auxEnvAcq cfg2 = { 0 };
     cfg2 = *cfg;
 
     afxClassConfig wndClsCfg = _AUX_WND_CLASS_CONFIG;
@@ -678,7 +680,7 @@ _QOW afxError _QowEnvCtorCb(afxEnvironment env, void** args, afxUnit invokeNo)
             dwm->refreshRate = 1;
         }
 
-        env->m.pimpl = &_QOW_ENV_IMPL;
+        env->m.ddi = &_QOW_DDI_ENV;
 
         {
             // attach HIDs

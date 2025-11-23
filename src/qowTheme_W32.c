@@ -19,7 +19,7 @@
 
 _QOW afxError _QowThemDtorCb(afxTheme them)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_THEM, 1, &them);
 
     if (_AUX_THEM_CLASS_CONFIG.dtor(them))
@@ -30,7 +30,7 @@ _QOW afxError _QowThemDtorCb(afxTheme them)
 
 _QOW afxError _QowThemCtorCb(afxTheme them, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_THEM, 1, &them);
 
     afxEnvironment env = args[0];

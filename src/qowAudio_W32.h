@@ -32,11 +32,11 @@
 #define _AMX_SINK_IMPL
 #define _AMX_AUDIO_C
 //#define _AMX_BUFFER_IMPL
-#include "../qwadro_afx/src/mix/ddi/amxImplementation.h"
+#include "../qwadro_afx/src/mix/amxIcd.h"
 #include "../../icd_amiga/src/zalBase.h"
 #include "../../icd_amiga/src/zalInteropWasapi.h"
 #define _AUX_UX_C
-#include "../qwadro_afx/src/ux/impl/auxImplementation.h"
+#include "../qwadro_afx/src/ux/auxIcd.h"
 
 AFX_OBJECT(afxSink)
 {

@@ -364,7 +364,7 @@ _QOW afxKey const _win32VkToQwadro[256] =
 
 _QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxEnvironment env, afxWindow wnd)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     afxByte bytes[4096] = { 0 };
     UINT bufSiz;
     afxResult rslt = 0;
@@ -489,10 +489,42 @@ _QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxEnvironment env, 
 
                     //if (foregroundInput)
                     {
-                        if (rid->data.mouse.usFlags == MOUSE_MOVE_RELATIVE || rid->data.mouse.usFlags == MOUSE_MOVE_ABSOLUTE)
+                        if (rid->data.mouse.usFlags == MOUSE_MOVE_RELATIVE)
                         {
                             afxReal motion[2] = { rid->data.mouse.lLastX, rid->data.mouse.lLastY };
                             AfxEmulateMouseMotion(0, motion);
+                        }
+                        else if (rid->data.mouse.usFlags == MOUSE_MOVE_ABSOLUTE)
+                        {
+                            POINT pos = { 0 };
+                            int width, height;
+
+                            if (rid->data.mouse.usFlags & MOUSE_VIRTUAL_DESKTOP)
+                            {
+                                pos.x += GetSystemMetrics(SM_XVIRTUALSCREEN);
+                                pos.y += GetSystemMetrics(SM_YVIRTUALSCREEN);
+                                width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                                height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                            }
+                            else
+                            {
+                                width = GetSystemMetrics(SM_CXSCREEN);
+                                height = GetSystemMetrics(SM_CYSCREEN);
+                            }
+
+                            pos.x += (int)((rid->data.mouse.lLastX / 65535.f) * width);
+                            pos.y += (int)((rid->data.mouse.lLastY / 65535.f) * height);
+                            ScreenToClient(wnd->hWnd, &pos);
+                            
+                            afxReal motion[2] =
+                            {
+                                pos.x - wnd->m.cursPos[0],
+                                pos.y - wnd->m.cursPos[1]
+                            };
+                            AfxEmulateMouseMotion(0, motion);
+
+                            wnd->m.cursPos[0] += motion[0];
+                            wnd->m.cursPos[1] += motion[1];
                         }
 
                         if (RI_MOUSE_WHEEL == (usButtonFlags & RI_MOUSE_WHEEL))
@@ -531,7 +563,7 @@ _QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxEnvironment env, 
                     default: break;
                     }
                     //afxKey key = vkDereferenceMap[rid->data.keyboard.VKey];
-                    afxUnit8 pressure = (RI_KEY_BREAK == (rid->data.keyboard.Flags & RI_KEY_BREAK) || !foregroundInput) ? 0x00 : 0xFF; //!!(rid->data.keyboard.Message == WM_KEYDOWN || rid->data.keyboard.Message == WM_SYSKEYDOWN);
+                    afxUnit8 pressure = ((RI_KEY_BREAK == (rid->data.keyboard.Flags & RI_KEY_BREAK)) || !foregroundInput) ? 0x00 : 0xFF; //!!(rid->data.keyboard.Message == WM_KEYDOWN || rid->data.keyboard.Message == WM_SYSKEYDOWN);
                     afxBool wasUp = ((rid->data.keyboard.Flags & RI_KEY_BREAK) != 0);
                     UINT key = (rid->data.keyboard.MakeCode << 16) | (isE0 << 24);
 
@@ -552,7 +584,7 @@ _QOW afxResult _QowProcessSystemInputMessageWin32(MSG* msg, afxEnvironment env, 
 
 _QOW afxError _QowHidDtorCb(afxHid hid)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_HID, 1, &hid);
 
     static RAWINPUTDEVICE const rid[] =
@@ -587,7 +619,7 @@ _QOW afxError _QowHidDtorCb(afxHid hid)
 
 _QOW afxResult _QowHidCtorCb(afxHid hid, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_HID, 1, &hid);
 
     afxDriver icd = args[0];

@@ -19,7 +19,7 @@
 
 _QOW afxError _QowFntDtorCb(afxFont fnt)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_FNT, 1, &fnt);
 
     if (_AUX_FNT_CLASS_CONFIG.dtor(fnt))
@@ -30,7 +30,7 @@ _QOW afxError _QowFntDtorCb(afxFont fnt)
 
 _QOW afxError _QowFntCtorCb(afxFont fnt, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_FNT, 1, &fnt);
 
     afxEnvironment env = args[0];

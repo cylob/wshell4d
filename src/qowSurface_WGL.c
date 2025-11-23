@@ -22,9 +22,27 @@
 #include "qowBase.h"
 #include "qowVideo_W32.h"
 
+//#define _NEVER_RESTORE_WGL_CONTEXT TRUE
+#define _ALWAYS_RESTORE_WGL_CONTEXT TRUE
+//#define _NEVER_FLUSH_DWM TRUE
+//#define _ALWAYS_FLUSH_DWM TRUE
+//#define _ALWAYS_FLUSH_DWM_FSE TRUE
+#define _SWAP_BUFFERS_WITH_WGL TRUE
+#define _SWAP_BUFFERS_WITH_GDI TRUE
+#define _CLEAR_BUFFERS_WITH_COLOR TRUE
+//#define _CLEAR_BUFFERS_WITH_BLACK TRUE
+//#define _UNBIND_BLIT_SRC_FBO TRUE
+//#define _UNBIND_BLIT_DST_FBO TRUE
+//#define _FLUSH_AFTER_BLIT_FBO TRUE
+//#define _YIELD_AFTER_SWAP_BUFFERS TRUE
+//#define _SLEEP_AFTER_SWAP_BUFFERS TRUE
+#ifdef _SLEEP_AFTER_SWAP_BUFFERS
+#define _SLEEP_TIME_AFTER_SWAP_BUFFERS 2 // ms
+#endif//_SLEEP_AFTER_SWAP_BUFFERS
+
 _QOW afxUnit _ZglDoutIsSuspended(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     AfxLockFutex(&dout->m.suspendSlock, TRUE);
     afxUnit suspendCnt = dout->m.suspendCnt;
@@ -34,7 +52,7 @@ _QOW afxUnit _ZglDoutIsSuspended(afxSurface dout)
 
 _QOW afxUnit _ZglDoutSuspendFunction(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     AfxLockFutex(&dout->m.suspendSlock, FALSE);
     afxUnit suspendCnt = ++dout->m.suspendCnt;
@@ -44,7 +62,7 @@ _QOW afxUnit _ZglDoutSuspendFunction(afxSurface dout)
 
 _QOW afxUnit _ZglDoutResumeFunction(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     AfxLockFutex(&dout->m.suspendSlock, FALSE);
     afxUnit suspendCnt = --dout->m.suspendCnt;
@@ -54,7 +72,7 @@ _QOW afxUnit _ZglDoutResumeFunction(afxSurface dout)
 
 _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     afxSurface dout = ctrl->dout;
     afxUnit bufIdx = ctrl->bufIdx;
@@ -88,6 +106,20 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 
     if (buf->glHandle)
     {
+        if (ctrl->wait)
+        {
+            // Just a copy of _DpuWaitForFence, just because we are not the DPU here.
+            avxFence fenc = ctrl->wait;
+            GLsync glHandle = AfxLoadAtomPtr(&fenc->glHandleAtom);
+
+            if (glHandle)
+            {
+                AFX_ASSERT(gl->IsSync(glHandle));
+                //AFX_ASSERT(fenc->glHandle == glHandle);
+                gl->WaitSync(glHandle, GL_NONE, GL_TIMEOUT_IGNORED);
+            }
+        }
+
         if (!dout->wgl.swaps[bufIdx].swapFboReady)
         {
             // deferred regen because we need a context.
@@ -122,51 +154,214 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
         //gl->InvalidateFramebuffer(GL_DRAW_FRAMEBUFFER, ARRAY_SIZE(invBufs), invBufs); _ZglThrowErrorOccuried();
         gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried();
         //gl->InvalidateFramebuffer(GL_DRAW_FRAMEBUFFER, ARRAY_SIZE(invBufs), invBufs); _ZglThrowErrorOccuried();
+#ifndef _CLEAR_BUFFERS_WITH_COLOR
         gl->Clear(clearBitmask);  _ZglThrowErrorOccuried();
-        //gl->ClearBufferfv(GL_COLOR, /*GL_DRAW_BUFFER0 +*/ 0, AFX_V4D_ZERO); _ZglThrowErrorOccuried();
+#else
+        gl->ClearBufferfv(GL_COLOR, /*GL_DRAW_BUFFER0 +*/ 0,
+            (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE)) ?  AFX_V4D_ZERO : 
+#ifdef _CLEAR_BUFFERS_WITH_BLACK
+            AFX_V4D_IDENTITY
+#else
+            AFX_V4D_ONE
+#endif//_CLEAR_BUFFERS_WITH_BLACK
+        ); _ZglThrowErrorOccuried();
+#endif//_CLEAR_BUFFERS_WITH_COLOR
 
-        afxInt x = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? rc.area.w : 0;
-        afxInt y = (dout->m.presentTransform & avxVideoTransform_FLIP) ? rc.area.h : 0;
-        afxInt w = (dout->m.presentTransform & avxVideoTransform_MIRROR) ? 0 : rc.area.w;
-        afxInt h = (dout->m.presentTransform & avxVideoTransform_FLIP) ? 0 : rc.area.h;
+        avxVideoTransform xforms = dout->m.presentTransform;
 
-        if (dout->m.presentTransform & avxVideoTransform_TRANSPOSE)
+        afxInt x = (xforms & avxVideoTransform_MIRROR) ? rc.area.w : 0;
+        afxInt y = (xforms & avxVideoTransform_FLIP) ? rc.area.h : 0;
+        afxInt w = (xforms & avxVideoTransform_MIRROR) ? 0 : rc.area.w;
+        afxInt h = (xforms & avxVideoTransform_FLIP) ? 0 : rc.area.h;
+
+        /*
+            avxVideoTransform_CENTER is not a geometric transform.
+            It is a layout transform --- a directive for how to place a smaller image into a larger destination rectangle.
+            Others modify orientation, but CENTER modifies placement. This is why it looks weird and doesn't combine naturally with the other transforms.            
+            
+            CENTER means: Place the source image centered inside the destination rectangle rather than stretching or anchoring it to (0,0).
+            In a video pipeline, this is used when the source image has a different aspect ratio, the destination framebuffer is larger,
+            or the user wants the image centered with letterboxing/pillarboxing.
+            It don't perform any scaling, rotation, or cropping --- just centering.
+
+            It does not alter pixel orientation. It only changes the destination rectangle offset.
+        */
+
+        GLuint srcX0 = 0, srcY0 = 0, srcX1 = 0, srcY1 = 0, dstX0 = 0, dstY0 = 0, dstX1 = 0, dstY1 = 0;
+
+        if (xforms & avxVideoTransform_TRANSPOSE)
         {
-            // See y, x, h, w instaed of x, y, w, h.
-            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, y, x, h, w, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+            srcX0 = 0;
+            srcY0 = 0;
+            srcX1 = rc.area.w;
+            srcY1 = rc.area.h;
+            dstX0 = y;
+            dstY0 = x;
+            dstX1 = h;
+            dstY1 = w;
         }
         else
         {
-            gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, x, y, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+            srcX0 = 0;
+            srcY0 = 0;
+            srcX1 = rc.area.w;
+            srcY1 = rc.area.h;
+            dstX0 = x;
+            dstY0 = y;
+            dstX1 = w;
+            dstY1 = h;
         }
-        //gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
-        //gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
-        //gl->Flush();
-#if !0
+
+        if (xforms & avxVideoTransform_CENTER)
+        {
+            // Center is layout transform, not shape transforms.
+            // Common layout transforms include CENTER, FIT, FILL, CROP, LETTERBOX.
+
+            /*
+                SIGMA Technology Group essay.
+
+                How CENTER probably interacts with TRANSPOSE
+                If the display is rotated (TRANSPOSE), CENTER should perform the transpose first,
+                then compute centering using the transposed dimensions, then offset the destination rect accordingly.
+                So CENTER doesn't care about orientation --- it only cares about sizes.
+
+                EXAMPLE:
+                {
+                    offsetX = (dst.width - src.width) / 2;
+                    GLuint offsetY = (dst.height - src.height) / 2;
+                    GLuint wW = offsetX + src.w;
+                    GLuint wH = offsetY + src.h;
+                    glBlitFramebuffer(
+                    0, 0, src.w, src.h,
+                    offsetX, offsetY, offsetX + src.w, offsetY + src.h,
+                    GL_COLOR_BUFFER_BIT, GL_NEAREST
+                    );
+                }
+            */
+        }
+
+        /*
+            Correct stacking order of transforms.
+            Transforms must apply in this order:
+            1. TRANSPOSE    (affects width/height)
+            2. MIRROR/FLIP  (affects coordinate order)
+            3. CENTER       (affects offset of destination rectangle)
+
+            Why this order?
+            TRANSPOSE changes the meaning of axes, so must be first.
+            MIRROR/FLIP only make sense after axes are defined.
+            CENTER offsets into the final destination canvas, so must be last.
+        */
+
+        // Apply TRANSPOSE to logical source size.
+        
+        int logicalW = (xforms & avxVideoTransform_TRANSPOSE) ? rc.area.h : rc.area.w;
+        int logicalH = (xforms & avxVideoTransform_TRANSPOSE) ? rc.area.w : rc.area.h;
+
+        // Compute CENTER offset (if any).
+
+        int offX = 0;
+        int offY = 0;
+        if (xforms & avxVideoTransform_CENTER)
+        {
+            offX = (dout->m.dstArea.w - logicalW) / 2;
+            offY = (dout->m.dstArea.h - logicalH) / 2;
+        }
+
+        // Compute flip/mirror edges.
+        int x0 = (xforms & avxVideoTransform_MIRROR) ? logicalW : 0;
+        int x1 = (xforms & avxVideoTransform_MIRROR) ? 0 : logicalW;
+
+        int y0 = (xforms & avxVideoTransform_FLIP) ? logicalH : 0;
+        int y1 = (xforms & avxVideoTransform_FLIP) ? 0 : logicalH;
+
+        // Apply TRANSPOSE mapping.
+
+        if (xforms & avxVideoTransform_TRANSPOSE)
+        {
+            gl->BlitFramebuffer(
+                0, 0, rc.area.h, rc.area.w,
+                offY + y0, offX + x0, offY + y1, offX + x1,
+                GL_COLOR_BUFFER_BIT, GL_NEAREST
+            );
+        }
+        else
+        {
+            gl->BlitFramebuffer(
+                0, 0, rc.area.w, rc.area.h,
+                offX + x0, offY + y0, offX + x1, offY + y1,
+                GL_COLOR_BUFFER_BIT, GL_NEAREST
+            );
+        }
+
+        //gl->BlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+
+        if (ctrl->signal)
+        {
+            // Just a copy of _DpuSignalFence, just because we are not the DPU.
+            avxFence fenc = ctrl->signal;
+            GLsync glHandle = gl->FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            AFX_ASSERT(gl->IsSync(glHandle));
+            glHandle = AfxExchangeAtomPtr(&fenc->glHandleAtom, glHandle);
+            if (glHandle)
+            {
+                AFX_ASSERT(gl->IsSync(glHandle));
+                //AFX_ASSERT(fenc->glHandle == glHandle);
+                gl->DeleteSync(glHandle);
+            }
+            // We are not a DPU, we have to busy-wait if needed.
+            //AfxPushLink(&fenc->onSignalChain, &dpu->fenceSignalChain);
+        }
+
+#ifdef _UNBIND_BLIT_SRC_FBO
+        gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
+#endif//_UNBIND_BLIT_SRC_FBO
+#ifdef _UNBIND_BLIT_DST_FBO
+        gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
+#endif//_UNBIND_BLIT_DST_FBO
+#ifdef _FLUSH_AFTER_BLIT_FBO
+        gl->Flush();
+#endif//_FLUSH_AFTER_BLIT_BUFFERS
+#ifdef _SWAP_BUFFERS_WITH_WGL
         if (dout->wgl.swapOnWgl)
         {
             wglSwapBuffersWIN(dout->hDC);
         }
         else
-#endif
+#endif//_SWAP_BUFFERS_WITH_WGL
         {
             SwapBuffers(dout->hDC);
         }
 
+#ifndef _NEVER_FLUSH_DWM
+#ifndef _ALWAYS_FLUSH_DWM
         if (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE))
+#endif//_ALWAYS_FLUSH_DWM
         {
+#ifndef _ALWAYS_FLUSH_DWM_FSE
             if (!dout->m.fse)
+#endif//_ALWAYS_FLUSH_DWM_FSE
                 DwmFlush();
         }
+#endif//_NEVER_FLUSH_DWM
     }
 
+#ifndef _NEVER_RESTORE_WGL_CONTEXT
+#ifndef _ALWAYS_RESTORE_WGL_CONTEXT
     if (mustRestoreCtx)
+#endif//_ALWAYS_UNBIND_WGL_CONTEXT
     {
         wglMakeCurrentWIN(bkpHdc, bkpGlrc);
     }
+#endif//_NEVER_RESTORE_WGL_CONTEXT
 
-    //AfxYield();
-    AfxSleep(1);
+#ifdef _SLEEP_AFTER_SWAP_BUFFERS
+    AfxSleep(_SLEEP_TIME_AFTER_SWAP_BUFFERS);
+#else
+#ifdef _YIELD_AFTER_SWAP_BUFFERS
+    AfxYield();
+#endif//_YIELD_AFTER_SWAP_BUFFERS
+#endif//_SLEEP_AFTER_SWAP_BUFFERS
 
     return err;
 }
@@ -174,12 +369,12 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 #if !0
 _QOW afxError _DpuPresentDout_BlitSwapFbo(zglDpu* dpu, avxPresentation* ctrl)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     afxSurface dout = ctrl->dout;
     afxUnit bufIdx = ctrl->bufIdx;
 
-    if (afxError_TIMEOUT == AvxWaitForFences(AfxGetHost(ctrl->dout), AFX_TIMEOUT_NONE, FALSE, 1, &ctrl->waitOnDpu, NIL))
+    if (afxError_TIMEOUT == AvxWaitForFences(AfxGetHost(ctrl->dout), AFX_TIMEOUT_IGNORED, FALSE, 1, /*&ctrl->waitOnDpu*/&ctrl->wait, NIL))
     {
         return afxError_TIMEOUT;
     }
@@ -329,7 +524,7 @@ _QOW afxError _DpuPresentDout_BlitSwapFbo(zglDpu* dpu, avxPresentation* ctrl)
 
 _QOW afxError _DpuPresentDout_BlitRas(zglDpu* dpu, afxSurface dout, afxUnit bufIdx)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     //if (_ZglActivateDout(dpu, dout))
         //AfxThrowError();
@@ -481,7 +676,7 @@ _QOW afxError _DpuPresentDout_BlitRas(zglDpu* dpu, afxSurface dout, afxUnit bufI
 #if 0
 _QOW afxError _DpuPresentDout(zglDpu* dpu, afxSurface dout, afxUnit outBufIdx)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     afxDrawSystem dsys = dpu->activeDsys;
     AFX_ASSERT_OBJECTS(afxFcc_DSYS, 1, &dsys);
@@ -528,7 +723,7 @@ _QOW afxError _DpuPresentDout(zglDpu* dpu, afxSurface dout, afxUnit outBufIdx)
 
 _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
     
     afxDrawSystem dsys = AvxGetSurfaceHost(dout);
@@ -729,11 +924,11 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
     afxReal64 physAspRatio = (afxReal64)GetDeviceCaps(dout->hDC, HORZSIZE) / (afxReal64)GetDeviceCaps(dout->hDC, VERTSIZE);
     afxReal refreshRate = GetDeviceCaps(dout->hDC, VREFRESH);
     avxModeSetting mode = { 0 };
-    AvxQuerySurfaceSettings(dout, &mode);
+    AvxQuerySurfaceMode(dout, &mode);
     mode.refreshRate = refreshRate;
     mode.wpOverHp = physAspRatio;
     mode.resolution = screenRes;
-    AvxChangeSurfaceSettings(dout, &mode);
+    AvxResetSurfaceMode(dout, &mode);
 
     HDC bkpHdc = wglGetCurrentDCWIN();
     HGLRC bkpGlrc = wglGetCurrentContextWIN();
@@ -912,7 +1107,7 @@ void _ZglPlaceFseSurfaceW32(HWND hwnd)
 
 _QOW afxError _ZglDoutAdjust_WGL(afxSurface dout, afxRect const* area, afxBool fse)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
 
     _AvxDoutImplAdjustCb(dout, area, fse);
 
@@ -925,7 +1120,7 @@ _QOW afxError _ZglDoutAdjust_WGL(afxSurface dout, afxRect const* area, afxBool f
 
 _QOW afxError _ZglDoutIoctl_WGL(afxSurface dout, afxUnit code, va_list ap)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     switch (code)
@@ -945,20 +1140,20 @@ _QOW afxError _ZglDoutIoctl_WGL(afxSurface dout, afxUnit code, va_list ap)
     return err;
 }
 
-_QOW _avxDoutDdi const _ZGL_DOUT_DDI =
+_QOW _avxDdiDout const _ZGL_DDI_DOUT =
 {
     .ioctlCb = _ZglDoutIoctl_WGL,
     .adjustCb = _ZglDoutAdjust_WGL,
     .regenCb = _AvxDoutImplRegenBuffers,
-    .lockCb = NIL,
-    .unlockCb = NIL,
+    .lockCb = _AvxDoutImplLockBufferCb,
+    .unlockCb = _AvxDoutImplUnlockBufferCb,
     .presentCb = _ZglDoutPresent_WGL,
     .presOnDpuCb = (void*)_DpuPresentDout_BlitSwapFbo
 };
 
 _QOW afxError _ZglDoutDtorCb(afxSurface dout)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     _ZglDoutSuspendFunction(dout);
@@ -990,7 +1185,7 @@ _QOW afxError _ZglDoutDtorCb(afxSurface dout)
 
 _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
     afxDrawSystem dsys = args[0];
@@ -1004,7 +1199,7 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
         return err;
     }
 
-    dout->m.pimpl = &_ZGL_DOUT_DDI;
+    dout->m.ddi = &_ZGL_DDI_DOUT;
 
     dout->hInst = cfg->iop.w32.hInst;
     dout->hWnd = cfg->iop.w32.hWnd;
@@ -1047,7 +1242,7 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
             };
             afxReal64 physAspRatio = (afxReal64)GetDeviceCaps(dc, HORZSIZE) / (afxReal64)GetDeviceCaps(dc, VERTSIZE);
             afxReal refreshRate = GetDeviceCaps(dc, VREFRESH);
-            AvxChangeSurfaceSettings(dout, physAspRatio, refreshRate, screenRes, FALSE);
+            AvxResetSurfaceMode(dout, physAspRatio, refreshRate, screenRes, FALSE);
         }
         ReleaseDC(hWnd, dc);
 #endif

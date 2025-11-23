@@ -261,7 +261,7 @@ BOOL GetMonitorNameFromHMONITOR(HMONITOR hMonitor, char* outName, size_t outName
 
 _QOW afxResult _ZglVduIoctrlCb(afxDisplay vdu, afxUnit reqCode, va_list va)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_VDU, 1, &vdu);
     afxResult rslt = 0;
 
@@ -308,7 +308,7 @@ _QOW afxResult _ZglVduIoctrlCb(afxDisplay vdu, afxUnit reqCode, va_list va)
 
 _QOW afxUnit _ZglChooseDisplayModes(afxDrawDevice ddev, afxUnit vdu, avxDisplayMode const* expected, avxDisplayMode* closest)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_DDEV, 1, &ddev);
     afxUnit rslt = 0;
 
@@ -325,7 +325,7 @@ _QOW afxUnit _ZglChooseDisplayModes(afxDrawDevice ddev, afxUnit vdu, avxDisplayM
 
 _QOW afxUnit _ZglEnumerateDisplayFormats(afxModule icd, afxUnit vdu, afxUnit cnt, avxFormat formats[])
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT(formats);
     AFX_ASSERT(cnt);
     afxUnit rslt = 0;
@@ -529,7 +529,7 @@ _QOW afxUnit _ZglEnumerateDisplayFormats(afxModule icd, afxUnit vdu, afxUnit cnt
 
 _QOW afxUnit _ZglEnumerateDisplayModes(afxModule icd, afxUnit vdu, avxFormat fmt, afxUnit cnt, avxDisplayMode modes[])
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT(modes);
     AFX_ASSERT(cnt);
     afxUnit rslt = 0;
@@ -700,7 +700,7 @@ BOOL CALLBACK MonitorEnumProc2(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 
 _QOW afxError _ZglVduDtorCb(afxDisplay vdu)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_VDU, 1, &vdu);
 
     AfxExhaustChainedClasses(&vdu->m.dev.classes);
@@ -713,7 +713,7 @@ _QOW afxError _ZglVduDtorCb(afxDisplay vdu)
 
 _QOW afxError _ZglVduCtorCb(afxDisplay vdu, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_VDU, 1, &vdu);
 
     afxModule icd = args[0];

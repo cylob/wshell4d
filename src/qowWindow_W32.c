@@ -19,6 +19,29 @@
 
 extern afxKey const Scan1MakeToQwadroDereferenceMap[afxKey_TOTAL];
 
+_QOWINL void _QowRectFromAfx(RECT* wrc, afxRect const* rc)
+{
+    wrc->left = rc->x;
+    wrc->top = rc->y;
+    wrc->right = rc->w + rc->x;
+    wrc->bottom = rc->h + rc->y;
+}
+
+_QOWINL void _QowRectFromW32(afxRect* rc, RECT const* wrc)
+{
+    rc->x = wrc->left;
+    rc->y = wrc->top;
+    rc->w = wrc->right - wrc->left;
+    rc->h = wrc->bottom - wrc->top;
+}
+
+_QOWINL HWND _QowWndGetHandleWin32(afxWindow wnd)
+{
+    afxError err = { 0 };
+    AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
+    return wnd->hWnd;
+}
+
 _QOW void CalcWindowValuesW32(HWND window, afxInt* out_extra_width, afxInt32* out_extra_height)
 {
     RECT r, c;
@@ -60,17 +83,17 @@ _QOW void GetWindowFrameMargins(HWND hwnd, afxInt32* left, afxInt32* top, afxInt
     ClientToScreen(hwnd, &clientTopLeft);
     ClientToScreen(hwnd, &clientBottomRight);
 
-    *left = clientTopLeft.x - windowRect.left;
-    *top = clientTopLeft.y - windowRect.top;
-    *right = windowRect.right - clientBottomRight.x;
-    *bottom = windowRect.bottom - clientBottomRight.y;
+    *left = windowRect.left - clientTopLeft.x;
+    *top = windowRect.top - clientTopLeft.y;
+    *right = (windowRect.right - windowRect.left) - (clientBottomRight.x - clientTopLeft.x);
+    *bottom = (windowRect.bottom - windowRect.top) - (clientBottomRight.y - clientTopLeft.y);
 }
 
 #if 0
 _QOW HICON _AuxCreateWin32Icon(afxTarga const* tga, afxUnit xHotspot, afxUnit yHotspot, afxBool icon)
 // Creates an RGBA icon or cursor
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     HICON handle = NIL;
 
     BITMAPV5HEADER bi = { 0 };
@@ -239,7 +262,7 @@ _QOW afxError _AuxExtractWin32Cursor(HCURSOR cursor, int* width, int* height, un
 _QOW HICON _AuxCreateWin32IconFromRaster(avxRaster ras, avxRasterRegion const* rgn, afxBool cursor, afxUnit xHotspot, afxUnit yHotspot)
 // Creates an RGBA icon or cursor
 {
-    afxError err = NIL;
+    afxError err = { 0 };
     HICON handle = NIL;
 
     AFX_ASSERT(ras);
@@ -423,7 +446,7 @@ _QOW void ShakeWindow(afxWindow wnd)
 
 _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     afxWindow wnd = (afxWindow)(GetWindowLongPtr(hWnd, GWLP_USERDATA));
     if (!wnd)
     {
@@ -484,15 +507,17 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         if (LOWORD(lParam) == HTCLIENT)
         {
-            auxEvent ev = { 0 };
-            ev.id = auxEventId_CURS_IN;
-            AfxEmitEvent(wnd, &ev.ev);
-
             if (wnd->hCursor)
             {
                 wnd->hCursorBkp = SetCursor(wnd->hCursor);
                 return TRUE;
             }
+
+            auxEvent ev = { 0 };
+            ev.ev.id = afxEvent_UX;
+            ev.wnd = wnd;
+            ev.id = auxEventId_CURS_ENTER;
+            AfxEmitEvent(wnd, &ev.ev);
         }
 
         break;
@@ -524,6 +549,12 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         AfxV2dNdc(wnd->m.cursPosNdc, wnd->m.cursPos, screen);
         AfxV2dNdc(wnd->m.cursMoveNdc, wnd->m.cursMove, screen);
 
+        auxEvent ev = { 0 };
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_CURS_MOTION;
+        AfxEmitEvent(wnd, &ev.ev);
+
         //data2->breake = TRUE;
         return 0;//break;
     }
@@ -536,7 +567,9 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         */
 
         auxEvent ev = { 0 };
-        ev.id = auxEventId_CURS_OUT;
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_CURS_LEAVE;
         AfxEmitEvent(wnd, &ev.ev);
 
         // Mouse left the window; reset tracking.
@@ -559,7 +592,9 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         */
 
         auxEvent ev = { 0 };
-        ev.id = auxEventId_CURS_ON;
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_CURS_HOVER;
         AfxEmitEvent(wnd, &ev.ev);
 
         // Mouse hovered without moving
@@ -589,23 +624,22 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
     {
         switch (wParam & 0xfff0)
         {
+        case SC_KEYMENU:
+        {
+            // User trying to access window menu (using ALT key)
+            // Disable OS menu to avoid stall.
+            return 0;
+            //break;
+        }
         case SC_SCREENSAVE: // screensaver trying to start
         case SC_MONITORPOWER: // monitor trying to enter powersave mode
         {
             if (wnd->m.fullscreen)
             {
-                // We are running in full screen mode, so disallow screen saver and screen blanking
+                // Disallow screen saver and screen blanking in fullscreen mode.
                 return 0;
-            }
+            }            
             break;
-        }
-        case SC_KEYMENU: // user trying to access window menu (using ALT key)
-        {
-            //if (!wnd->m.w32.keymenu)
-                //  return 0;
-
-            return 0; // disable OS menu to avoid stall.
-            //break;
         }
         }
         break;
@@ -617,10 +651,6 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         // lParam = This parameter is not used.
         // If an application processes this message, it should return zero.
 
-        auxEvent ev = { 0 };
-        ev.id = auxEventId_CLOSE;
-        AfxEmitEvent(wnd, &ev.ev);
-
         if (wnd->m.fullscreen)
         {
             AfxTakeFullscreen(wnd, FALSE);
@@ -628,14 +658,17 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         //PostQuitMessage(0); // Send A Quit Message
         ShowWindow(hWnd, SW_MINIMIZE);
+
+        auxEvent ev = { 0 };
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_CLOSE;
+        AfxEmitEvent(wnd, &ev.ev);
+
         return 0; // handled. Also prevent process at end of this function
     }
     case WM_ACTIVATE: // Watch For Window Activate Message
     {
-        auxEvent ev = { 0 };
-        ev.id = auxEventId_ACTIVATE;
-        AfxEmitEvent(wnd, &ev.ev);
-
         if (!HIWORD(wParam)) // Check Minimization State
         {
             wnd->m.active = TRUE; // Program Is Active
@@ -644,6 +677,13 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         {
             wnd->m.active = FALSE; // Program Is No Longer Active
         }
+
+        auxEvent ev = { 0 };
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_ACTIVATE;
+        AfxEmitEvent(wnd, &ev.ev);
+
         return 0; // Return To The Message Loop
     }
     case WM_SHOWWINDOW:
@@ -721,6 +761,13 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
                 break;
             }
         */
+
+        auxEvent ev = { 0 };
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_MOVE;
+        AfxEmitEvent(wnd, &ev.ev);
+
         break;
     }
     case WM_SIZING:
@@ -781,17 +828,48 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
                 return TRUE; // Indicate message was processed
             }
         */
-#if 0 // draw while resizing
-        afxRect cr = { 0 };
-        // lParam já é client area, filha da puta.
-        cr.w = LOWORD(lParam);
-        cr.h = HIWORD(lParam);
 
-        if (cr.w * cr.h) // don't set to zero
+        // Correct dragged edges by aspect ratio. The aspect ratio should be provided by user.
+
+        afxReal ratio = wnd->m.aspRatio;
+        if (!ratio) break;
+
+        RECT frame = { 0 };
+        AdjustWindowRectEx(&frame, wnd->dwStyle, FALSE, wnd->dwExStyle);
+        
+        RECT* rcInOut = (RECT*)lParam;
+
+        switch (/*edge*/wParam)
         {
-            AfxAdjustWindow(wnd, &cr);
+        case WMSZ_RIGHT:
+        case WMSZ_BOTTOMRIGHT:
+        case WMSZ_LEFT:
+        case WMSZ_BOTTOMLEFT:
+        {
+            rcInOut->bottom = rcInOut->top + 
+                (frame.bottom - frame.top) +
+                (int)(((rcInOut->right - rcInOut->left) - (frame.right - frame.left)) / ratio);
+            break;
         }
-#endif
+        case WMSZ_TOPRIGHT:
+        case WMSZ_TOPLEFT:
+        {
+            rcInOut->top = rcInOut->bottom - 
+                (frame.bottom - frame.top) -
+                (int)(((rcInOut->right - rcInOut->left) - (frame.right - frame.left)) / ratio);
+            break;
+        }
+        case WMSZ_BOTTOM:
+        case WMSZ_TOP:
+        {
+            rcInOut->right = rcInOut->left + 
+                (frame.right - frame.left) +
+                (int)(((rcInOut->bottom - rcInOut->top) - (frame.bottom - frame.top)) * ratio);
+            break;
+        }
+        default:
+            break;
+        }
         break;
     }
     case WM_SIZE:
@@ -855,11 +933,24 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
             if (cr.w * cr.h) // don't set to zero
             {
-                AfxAdjustWindow(wnd, &cr);
+                AfxAdjustWindow(wnd, NIL, &cr);
             }
         }
 #endif
-        //AfxDrawOutputProcess(dout);
+        afxRect cr = { 0 };
+        cr.w = LOWORD(lParam);
+        cr.h = HIWORD(lParam);
+        wnd->m.surfaceRc = cr;
+
+        // AdjustWindow does already emit this event.
+        if (!wnd->m.adjusting)
+        {
+            auxEvent ev = { 0 };
+            ev.ev.id = afxEvent_UX;
+            ev.wnd = wnd;
+            ev.id = auxEventId_SIZE;
+            AfxEmitEvent(wnd, &ev);
+        }
         break;
     }
     case WM_WINDOWPOSCHANGING:
@@ -957,6 +1048,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
             }
         */
 
+#if 0
         {
 
             RECT wr = { 0 };
@@ -965,32 +1057,24 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
             if (cr.w * cr.h) // don't set to zero
             {
-                AfxAdjustWindow(wnd, &cr);
+                AfxAdjustWindow(wnd, NIL, &cr);
             }
         }
-
-        auxEvent ev = { 0 };
-        ev.id = auxEventId_PLACEMENT;
-        ev.wnd = wnd;
-        AfxEmitEvent(wnd, &ev.ev);
+#endif
 
 #if 0
         if (wnd->m.fullscreen)
         {
             AfxTakeFullscreen(wnd, FALSE);
             AfxTakeFullscreen(wnd, TRUE);
-#if 0
-            RECT wr, cr;
-            GetWindowRect(hwnd, &wr);
-            GetClientRect(hwnd, &cr);
-            if (wr.right - wr.left == cr.right - cr.left && wr.bottom - wr.top == cr.bottom - cr.top)
-            {
-                if (cr.right - cr.left != fullscreen_width || cr.bottom - cr.top != fullscreen_height)
-                    app_screenmode(app, APP_SCREENMODE_WINDOW);
-            }
-#endif
         }
 #endif
+
+        WINDOWPOS* wp = (WINDOWPOS*)lParam;
+        RECT wrc = { wp->x, wp->y, wp->cx, wp->cy };
+        afxRect rc;
+        _QowRectFromW32(&rc, &wrc);
+        wnd->m.frameRc = rc;
 
         if (wnd->m.cursConfined)
         {
@@ -1008,18 +1092,18 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
     case WM_DISPLAYCHANGE: // The WM_DISPLAYCHANGE message is sent to all windows when the display resolution has changed.
     {
         HDC dc;
-        afxSurface dout = wnd->m.dout;
+        afxSurface dout = wnd->m.surfaceDout;
         AvxCallSurfaceEndpoint(dout, 0, &dc);
         avxRange const resolution = { GetDeviceCaps(dc, HORZRES), GetDeviceCaps(dc, VERTRES), GetDeviceCaps(dc, PLANES) };
         afxReal64 physAspRatio = AvxFindPhysicalAspectRatio(GetDeviceCaps(dc, HORZSIZE), GetDeviceCaps(dc, VERTSIZE));
         afxReal refreshRate = GetDeviceCaps(dc, VREFRESH);
 
         avxModeSetting mode = { 0 };
-        AvxQuerySurfaceSettings(dout, &mode);
+        AvxQuerySurfaceMode(dout, &mode);
         mode.refreshRate = refreshRate;
         mode.wpOverHp = physAspRatio;
         mode.resolution = resolution;
-        AvxChangeSurfaceSettings(dout, &mode);
+        AvxResetSurfaceMode(dout, &mode);
 
         afxDesktop* dwm = wnd->m.dwm;
         dwm->wpOverHp = physAspRatio;
@@ -1030,8 +1114,9 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         dwm->wrOverHr = (afxReal64)dwm->res.x / (afxReal64)dwm->res.y;
 
         auxEvent ev = { 0 };
-        ev.id = auxEventId_CHANGED;
+        ev.ev.id = afxEvent_UX;
         ev.wnd = wnd;
+        ev.id = auxEventId_CHANGED;
         AfxEmitEvent(wnd, &ev.ev);
 
         break;
@@ -1043,14 +1128,18 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         
         afxInt32 mleft, mtop, mright, mbottom;
         GetWindowFrameMargins(wnd->hWnd, &mleft, &mtop, &mright, &mbottom);
-        wnd->m.marginL = mleft;
-        wnd->m.marginT = mtop;
-        wnd->m.marginR = mright;
-        wnd->m.marginB = mbottom;
+        wnd->m.frameMarginL = mleft;
+        wnd->m.frameMarginT = mtop;
+        wnd->m.frameMarginR = mright;
+        wnd->m.frameMarginB = mbottom;
+
+        //wnd->dwStyle = GetWindowLongW(hWnd, GWL_STYLE);
+        //wnd->dwExStyle = GetWindowLongW(hWnd, GWL_EXSTYLE);
 
         auxEvent ev = { 0 };
-        ev.id = auxEventId_STYLE;
+        ev.ev.id = afxEvent_UX;
         ev.wnd = wnd;
+        ev.id = auxEventId_STYLE;
         AfxEmitEvent(wnd, &ev.ev);
 
         break;
@@ -1133,7 +1222,13 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
             afxBool liberated = !!ClipCursor(NULL);
             env->m.cursCapturedOn = NIL;
         }
-        
+#if 0
+        if (wnd->m.fullscreen)
+        {
+            ShowWindow(wnd->hWnd, SW_MINIMIZE);
+        }
+#endif
+
         _AfxEnvFocusWindowCb(env, NIL, NIL);
 
         //ShakeWindow(wnd);
@@ -1152,8 +1247,6 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
     }
     case WM_SETFOCUS: // Sent to a window after it has gained the keyboard focus.
     {
-        _AfxEnvFocusWindowCb(env, wnd, NIL);
-
         POINT cursorPos;
         if (GetCursorPos(&cursorPos))
         {
@@ -1187,46 +1280,34 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
                 }
             }
         }
-            
-#if 0
-        if (!AfxIsCursorOnSurface(wnd)) break; // Don't handle frame interaction; just handle cursor in surface.
-        else
-        {
-            if (wnd->m.cursorDisabled)
-            {
-                ShowCursor(FALSE);
-                0;//AfxDisableCursor(wnd);
-            }
-            else if (wnd->m.cursorConfined)
-            {
-                RECT cr;
-                GetClientRect(hWnd, &cr);
-                ClientToScreen(hWnd, (POINT*)&cr.left);
-                ClientToScreen(hWnd, (POINT*)&cr.right);
-                afxBool confined = !!ClipCursor(&cr);
 
-                if (confined)
-                    env->m.curCapturedOn = wnd;
-            }
-            return 0;
-        }
-#endif
+        _AfxEnvFocusWindowCb(env, wnd, NIL);
+
         break;
     }
     case WM_PAINT:
     {
+        // emit damage event to let the application do what ever it want.
+
+        auxEvent ev = { 0 };
+        ev.ev.id = afxEvent_UX;
+        ev.wnd = wnd;
+        ev.id = auxEventId_PAINT;
+        AfxEmitEvent(wnd, &ev.ev);
+
+        // Required?
+#if !0
         ValidateRect(hWnd, NULL);
-        //SetWindowTextA(wnd->m.wnd, AfxGetStringData(&wnd->m.caption.str, 0));
-        AfxRedrawWindow(wnd, NIL);
-        return 0; // An application returns zero if it processes this message.
+#endif
+        // An application returns zero if it processes this message.
+        return 0;
     }
     case WM_ERASEBKGND:
     {
         // Flicker is usually caused by interference via WM_ERASEBKGND. 
-        // If you haven't already, intercept WM_ERASEBKGND and do nothing in the regions where you are displaying OpenGL content.            
-        //ValidateRect(hWnd, NULL);
-        //AfxRedrawWindow(wnd, NIL);
-        return 1; // An application should return nonzero if it erases the background; otherwise, it should return zero.
+        // If you haven't already, intercept WM_ERASEBKGND and do nothing in the regions where you are displaying OpenGL content.
+        // An application should return nonzero if it erases the background; otherwise, it should return zero.
+        return 1;
     }
     default: break;
     }
@@ -1235,7 +1316,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
 _QOW afxError _QowWndChIconCb(afxWindow wnd, avxRaster ras, avxRasterRegion const* rgn)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
@@ -1270,7 +1351,7 @@ _QOW afxError _QowWndChIconCb(afxWindow wnd, avxRaster ras, avxRasterRegion cons
 
 _QOW afxError _QowWndChCursCb(afxWindow wnd, avxRaster ras, avxRasterRegion const* rgn, afxInt hotspotX, afxInt hotspotY)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
@@ -1299,7 +1380,7 @@ _QOW afxError _QowWndChCursCb(afxWindow wnd, avxRaster ras, avxRasterRegion cons
 
 _QOW afxBool DoutNotifyOvy(afxWindow wnd, afxUnit bufIdx)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
     wnd->lastBufIdx = bufIdx;
     wnd->swap = 1;
@@ -1307,9 +1388,25 @@ _QOW afxBool DoutNotifyOvy(afxWindow wnd, afxUnit bufIdx)
     return 1;
 }
 
+_QOW afxError _QowWndDamageCb(afxWindow wnd, afxRect const* rc)
+{
+    afxError err = { 0 };
+    AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
+
+    AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
+
+    // Force a WM_PAIN event.
+
+    RECT wrc;
+    _QowRectFromAfx(&wrc, rc);
+    InvalidateRect(wnd->hWnd, &wrc, FALSE);
+
+    return err;
+}
+
 _QOW afxError _QowWndRedrawCb(afxWindow wnd, afxRect const* rc)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
@@ -1335,7 +1432,7 @@ _QOW afxError _QowWndRedrawCb(afxWindow wnd, afxRect const* rc)
 #if 0
 _QOW afxBool AfxGetOnSurfaceScreenPosition(afxWindow wnd, afxUnit const screenPos[2], afxUnit surfPos[2])
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
     AFX_ASSERT(screenPos);
 
@@ -1351,7 +1448,7 @@ _QOW afxBool AfxGetOnSurfaceScreenPosition(afxWindow wnd, afxUnit const screenPo
 
 _QOW afxBool AfxGetOnScreenSurfacePosition(afxWindow wnd, afxUnit const surfPos[2], afxUnit screenPos[2])
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
     AFX_ASSERT(surfPos);
 
@@ -1366,10 +1463,477 @@ _QOW afxBool AfxGetOnScreenSurfacePosition(afxWindow wnd, afxUnit const surfPos[
 }
 #endif
 
-_QOW afxError _QowWndAdjustCb(afxWindow wnd, afxRect const* area)
+afxRect AdjustAnchoredRect(afxRect const* r, afxUnit newW, afxUnit newH, afxAnchor anchor)
 {
-    afxError err = AFX_ERR_NONE;
+    /*
+        Say you have a rect (x, y, w, h) and an anchor (e.g. CENTER | MIDDLE).
+        Now, suppose you change the width and height (w', h').
+        You want to produce a new rect (x', y', w', h') such that the anchored point stays still;
+        for example, whatever pixel the anchor represents before the resize is the same after.
+        That means your adjustment logic must shift x and/or y depending on what the anchor is.
+    */
+    afxRect out = *r;
+    afxUnit dx = newW - r->w;
+    afxUnit dy = newH - r->h;
+
+    // Horizontal adjustment
+    if (anchor & afxAnchor_CENTER)
+        out.x -= dx / 2;
+    else if (anchor & afxAnchor_RIGHT)
+        out.x -= dx;
+    // (LEFT = no change)
+
+    // Vertical adjustment
+    if (anchor & afxAnchor_MIDDLE)
+        out.y -= dy / 2;
+    else if (anchor & afxAnchor_BOTTOM)
+        out.y -= dy;
+    // (TOP = no change)
+
+    out.w = newW;
+    out.h = newH;
+    return out;
+}
+
+afxRect ClipRectToAnchor(afxRect const* screen, afxRect const* win, afxAnchor anchor)
+{
+    // Clip a smaller rectangle (the window) out of a larger rectangle (the screen or monitor area), positioned according to an anchor.
+    // Given the screen rect and the window’s size (w,h), compute its top-left (x,y) so 
+    // that the chosen anchor point of the window coincides with the anchor point of the screen.
+
+    afxRect out = *win;
+
+    // Horizontal alignment
+    //if ((anchor & afxAnchor_LEFT))
+        //out.x = screen->x;
+    //else 
+    if ((anchor & afxAnchor_CENTER))
+        out.x = screen->x + (screen->w - win->w) / 2;
+    else if ((anchor & afxAnchor_RIGHT))
+        out.x = screen->x + screen->w - win->w;
+
+    // Vertical alignment
+    //if ((anchor & afxAnchor_TOP))
+        //out.y = screen->y;
+    //else 
+    if ((anchor & afxAnchor_MIDDLE))
+        out.y = screen->y + (screen->h - win->h) / 2;
+    else if ((anchor & afxAnchor_BOTTOM))
+        out.y = screen->y + screen->h - win->h;
+
+    return out;
+}
+
+afxRect AdjustRect(afxRect r, afxAnchor anchor, int dw, int dh)
+{
+    /*
+        Anchoring is basically about where we consider the rectangle’s "pivot point" to be when we adjust it.
+
+        For example:
+        Anchor LEFT means adjustments happen with respect to the left edge; width grows to the right.
+        Anchor CENTER means the rectangle expands or moves symmetrically around its center.
+        Anchor RIGHT means width grows to the left (x decreases).
+        Similarly for TOP/MIDDLE/BOTTOM vertically.
+
+        That assumes:
+        (x, y) is top-left corner (Win32-style coordinate system).
+        w, h are positive.
+        dw, dh are the desired deltas (positive to expand, negative to shrink).
+    */
+
+    // Adjust width
+    if (anchor & afxAnchor_LEFT)
+    {
+        // Grow/shrink width to the right only
+        r.w += dw;
+    }
+    else if (anchor & afxAnchor_CENTER)
+    {
+        // Grow/shrink symmetrically around center
+        r.x -= dw / 2;
+        r.w += dw;
+    }
+    else if (anchor & afxAnchor_RIGHT)
+    {
+        // Grow/shrink width to the left
+        r.x -= dw;
+        r.w += dw;
+    }
+
+    // Adjust height
+    if (anchor & afxAnchor_TOP)
+    {
+        // Grow/shrink height downward
+        r.h += dh;
+    }
+    else if (anchor & afxAnchor_MIDDLE)
+    {
+        // Grow/shrink symmetrically vertically
+        r.y -= dh / 2;
+        r.h += dh;
+    }
+    else if (anchor & afxAnchor_BOTTOM)
+    {
+        // Grow/shrink height upward
+        r.y -= dh;
+        r.h += dh;
+    }
+
+    return r;
+}
+
+afxRect PositionByAnchor(afxRect r, afxAnchor anchor, int px, int py)
+{
+    /*
+        This is for placement instead of resizing.
+
+        If we want to move the rectangle (not resize)
+        If instead of resizing, we mean repositioning the rectangle based on an anchor point 
+        (e.g., place this rect so its CENTER is at (px, py)), then we can do this:
+    */
+    switch (anchor)
+    {
+    case afxAnchor_LEFT | afxAnchor_TOP:
+        r.x = px;
+        r.y = py;
+        break;
+
+    case afxAnchor_CENTER | afxAnchor_MIDDLE:
+        r.x = px - r.w / 2;
+        r.y = py - r.h / 2;
+        break;
+
+    case afxAnchor_RIGHT | afxAnchor_BOTTOM:
+        r.x = px - r.w;
+        r.y = py - r.h;
+        break;
+
+    case afxAnchor_RIGHT | afxAnchor_TOP:
+        r.x = px - r.w;
+        r.y = py;
+        break;
+
+    case afxAnchor_LEFT | afxAnchor_BOTTOM:
+        r.x = px;
+        r.y = py - r.h;
+        break;
+
+    default:
+        // Handle any combination
+        if (anchor & afxAnchor_RIGHT) r.x = px - r.w;
+        else if (anchor & afxAnchor_CENTER) r.x = px - r.w / 2;
+        else r.x = px;
+
+        if (anchor & afxAnchor_BOTTOM) r.y = py - r.h;
+        else if (anchor & afxAnchor_MIDDLE) r.y = py - r.h / 2;
+        else r.y = py;
+    }
+    return r;
+}
+
+_QOW afxRect _QowWndGetRectW32(afxWindow wnd, afxAnchor anchor)
+{
+    // Win32 Implementation Details
+
+    afxRect rect = { 0, 0, 0, 0 };
+
+    // Get client area size and position.
+
+    RECT rcClient;
+    if (!GetClientRect(wnd->hWnd, &rcClient))
+        return rect;
+
+    POINT origin = { rcClient.left, rcClient.top };
+    ClientToScreen(wnd->hWnd, &origin);
+
+    rect.w = rcClient.right - rcClient.left;
+    rect.h = rcClient.bottom - rcClient.top;
+
+    // Compute anchor-relative position.
+
+    rect.x = origin.x;
+    rect.y = origin.y;
+
+    // Adjust coordinates according to anchor
+    if (anchor & afxAnchor_CENTER)
+        rect.x += rect.w / 2;
+    else if (anchor & afxAnchor_RIGHT)
+        rect.x += rect.w;
+
+    if (anchor & afxAnchor_MIDDLE)
+        rect.y += rect.h / 2;
+    else if (anchor & afxAnchor_BOTTOM)
+        rect.y += rect.h;
+
+    // This way, rect.x, rect.y represent the anchor point in screen space.
+
+    // Wayland clients don't know their global position, so WE can only return 0.
+
+    /*
+        Usage example:
+
+        afxRect rect;
+        AfxGetWindowRect(win, afxAnchor_CENTER | afxAnchor_MIDDLE, &rect);
+        rect.w += 200;
+        rect.h += 100;
+        AfxAdjustWindow(win, afxAnchor_CENTER | afxAnchor_MIDDLE, &rect);
+    */
+
+    return rect;
+}
+
+_QOW void _QowWndAdjustW32(afxWindow wnd, afxAnchor anchor, afxRect const* area)
+{
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
+
+    // Win32 Implementation Details
+
+    // Interpret afxRect as client area target.
+
+    afxRect rect = *area;
+
+    RECT clientTarget = { 0, 0, rect.w, rect.h };
+    AdjustWindowRectEx(&clientTarget, GetWindowLong(wnd->hWnd, GWL_STYLE),
+        FALSE, GetWindowLong(wnd->hWnd, GWL_EXSTYLE));
+
+    int totalW = clientTarget.right - clientTarget.left;
+    int totalH = clientTarget.bottom - clientTarget.top;
+
+    // Get current window geometry.
+
+    RECT currentWin;
+    GetWindowRect(wnd->hWnd, &currentWin);
+
+    afxRect current = {
+        currentWin.left,
+        currentWin.top,
+        currentWin.right - currentWin.left,
+        currentWin.bottom - currentWin.top
+    };
+
+    // Compute anchor point.
+
+    POINT anchorPt = { current.x, current.y };
+
+    if (anchor & afxAnchor_CENTER)
+        anchorPt.x = current.x + current.w / 2;
+    else if (anchor & afxAnchor_RIGHT)
+        anchorPt.x = current.x + current.w;
+
+    if (anchor & afxAnchor_MIDDLE)
+        anchorPt.y = current.y + current.h / 2;
+    else if (anchor & afxAnchor_BOTTOM)
+        anchorPt.y = current.y + current.h;
+
+    // Compute adjusted target rect.
+
+    afxRect adjusted = rect;
+
+    // If rect.x/y == 0, treat as "don't move" (Wayland-style)
+    if (rect.x == 0 && rect.y == 0)
+    {
+        adjusted.x = current.x;
+        adjusted.y = current.y;
+    }
+    else
+    {
+        // Align the target window so that the anchor remains fixed
+        if (anchor & afxAnchor_RIGHT)
+            adjusted.x = anchorPt.x - totalW;
+        else if (anchor & afxAnchor_CENTER)
+            adjusted.x = anchorPt.x - totalW / 2;
+
+        if (anchor & afxAnchor_BOTTOM)
+            adjusted.y = anchorPt.y - totalH;
+        else if (anchor & afxAnchor_MIDDLE)
+            adjusted.y = anchorPt.y - totalH / 2;
+    }
+
+    // Apply only if changed.
+
+    if (current.x != adjusted.x || current.y != adjusted.y ||
+        current.w != totalW || current.h != totalH)
+    {
+        SetWindowPos(wnd->hWnd, NULL,
+            adjusted.x, adjusted.y,
+            totalW, totalH,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+
+    }
+
+    wnd->m.frameRc.w = totalW;
+    wnd->m.frameRc.h = totalH;
+    wnd->m.frameRc.x += adjusted.x;
+    wnd->m.frameRc.y += adjusted.y;
+    wnd->m.surfaceRc = *area;
+}
+
+afxRect ResolveSurfaceRect(
+    afxRect const* screen,
+    afxRect const* desired,
+    afxAnchor anchor,
+    afxRect const* current)
+{
+    afxRect out = *desired;
+
+    // If no anchor is specified, just preserve position
+    if (anchor == 0)
+    {
+        out.x = current->x;
+        out.y = current->y;
+        return out;
+    }
+
+    // Compute the anchor points in both rects
+    afxInt screenAx = screen->x;
+    afxInt screenAy = screen->y;
+    afxInt winAx = 0;
+    afxInt winAy = 0;
+
+    // Screen anchor point
+    if (anchor & afxAnchor_LEFT)
+        screenAx = screen->x;
+    else if (anchor & afxAnchor_CENTER)
+        screenAx = screen->x + screen->w / 2;
+    else if (anchor & afxAnchor_RIGHT)
+        screenAx = screen->x + screen->w;
+
+    if (anchor & afxAnchor_TOP)
+        screenAy = screen->y;
+    else if (anchor & afxAnchor_MIDDLE)
+        screenAy = screen->y + screen->h / 2;
+    else if (anchor & afxAnchor_BOTTOM)
+        screenAy = screen->y + screen->h;
+
+    // Window anchor point (relative to window's own rect)
+    if (anchor & afxAnchor_LEFT)
+        winAx = 0;
+    else if (anchor & afxAnchor_CENTER)
+        winAx = desired->w / 2;
+    else if (anchor & afxAnchor_RIGHT)
+        winAx = desired->w;
+
+    if (anchor & afxAnchor_TOP)
+        winAy = 0;
+    else if (anchor & afxAnchor_MIDDLE)
+        winAy = desired->h / 2;
+    else if (anchor & afxAnchor_BOTTOM)
+        winAy = desired->h;
+
+    // Position the window so its anchor point coincides with the screen's anchor point
+    out.x = screenAx - winAx + desired->x;
+    out.y = screenAy - winAy + desired->y;
+
+    return out;
+}
+
+_QOW afxError _QowWndAdjustCb(afxWindow wnd, afxAnchor anchor, afxRect* area)
+{
+    afxError err = { 0 };
+    AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
+
+    afxRect areaT, areaL, areaTL, areaCM, areaB, areaBR;
+    AfxGetWindowRect(wnd, afxAnchor_TOP, &areaT);
+    AfxGetWindowRect(wnd, afxAnchor_LEFT, &areaL);
+    AfxGetWindowRect(wnd, afxAnchor_TOP | afxAnchor_LEFT, &areaTL);
+    AfxGetWindowRect(wnd, afxAnchor_BOTTOM, &areaB);
+    AfxGetWindowRect(wnd, afxAnchor_BOTTOM | afxAnchor_RIGHT, &areaBR);
+    AfxGetWindowRect(wnd, afxAnchor_CENTER | afxAnchor_MIDDLE, &areaCM);
+
+    if (!anchor)
+    {
+        RECT winFrameRc, winClientRc;
+        GetWindowRect(wnd->hWnd, &winFrameRc);
+        GetClientRect(wnd->hWnd, &winClientRc);
+
+        RECT frame = { area->x, area->y, area->w, area->h };
+        AdjustWindowRectEx(&frame, GetWindowLong(wnd->hWnd, GWL_STYLE), FALSE, GetWindowLong(wnd->hWnd, GWL_EXSTYLE));
+        frame.left = winFrameRc.left;
+        frame.top = winFrameRc.top;
+
+        SetWindowPos(wnd->hWnd, NULL,
+            frame.left,
+            frame.top,
+            frame.right, frame.bottom,
+            SWP_NOZORDER);
+
+        wnd->m.frameRc.w = frame.right;
+        wnd->m.frameRc.h = frame.bottom;
+        wnd->m.frameRc.x = frame.left;
+        wnd->m.frameRc.y = frame.top;
+        area->x = 0;
+        area->y = 0;
+        wnd->m.surfaceRc = *area;
+        return err;
+    }
+
+    afxRect rect = ResolveSurfaceRect(&wnd->m.screenRc, area, anchor, &wnd->m.frameRc);
+    area->x = 0;
+    area->y = 0;
+
+    afxRect a = wnd->m.screenRc;
+    //afxRect rect = AfxAdjustAnchoredRect(&a, area->w, area->h, anchor);
+
+    RECT winFrameRc, winClientRc;
+    GetWindowRect(wnd->hWnd, &winFrameRc);
+    GetClientRect(wnd->hWnd, &winClientRc);
+
+    afxUnit ml, mt, mr, mb;
+    CalcWindowMarginsW32(wnd->hWnd, &ml, &mt, &mr, &mb);
+
+    if (!ml)
+        ml = wnd->m.frameMarginL;
+
+    if (!mt)
+        mt = wnd->m.frameMarginT;
+
+    //afxRect rect = anchor ? AfxClipRectToAnchor(&wnd->m.screenRc, area, anchor) : wnd->m.frameRc;
+    RECT frame = { 0, 0, rect.w, rect.h };
+    AdjustWindowRectEx(&frame, GetWindowLong(wnd->hWnd, GWL_STYLE), FALSE, GetWindowLong(wnd->hWnd, GWL_EXSTYLE));
+    frame.left = 0;
+    frame.top = 0;
+
+    if (!anchor || (anchor & afxAnchor_TOP))
+        frame.top = 0;
+
+    if (!anchor || (anchor & afxAnchor_LEFT))
+        frame.left = 0;
+
+    int fullW = frame.right - frame.left;
+    int fullH = frame.bottom - frame.top;
+
+    // This code is really a mess.
+    // Wayland fucked me all ways possible.
+
+    HWND hWndInsertAfter2 = wnd->m.alwaysOnTop ? HWND_TOPMOST : NIL;
+    UINT swpFlags2 = 0;// SWP_NOOWNERZORDER | SWP_NOZORDER;
+
+    SetWindowPos(wnd->hWnd, hWndInsertAfter2,
+        frame.left,
+        frame.top,
+        frame.right, frame.bottom,
+        SWP_NOZORDER);
+
+    wnd->m.frameRc.w = fullW;
+    wnd->m.frameRc.h = fullH;
+    wnd->m.frameRc.x = frame.left;
+    wnd->m.frameRc.y = frame.top;
+    wnd->m.surfaceRc = *area;
+    wnd->m.surfaceRc.x = 0;
+    wnd->m.surfaceRc.y = 0;
+
+    AfxGetWindowRect(wnd, afxAnchor_TOP, &areaT);
+    AfxGetWindowRect(wnd, afxAnchor_LEFT, &areaL);
+    AfxGetWindowRect(wnd, afxAnchor_TOP | afxAnchor_LEFT, &areaTL);
+    AfxGetWindowRect(wnd, afxAnchor_BOTTOM, &areaB);
+    AfxGetWindowRect(wnd, afxAnchor_BOTTOM | afxAnchor_RIGHT, &areaBR);
+    AfxGetWindowRect(wnd, afxAnchor_CENTER | afxAnchor_MIDDLE, &areaCM);
+
+    //_QowWndAdjustW32(wnd, anchor, area);
+    return err;
+
+
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
 
@@ -1388,10 +1952,10 @@ _QOW afxError _QowWndAdjustCb(afxWindow wnd, afxRect const* area)
         rc2.w = AFX_MAX(1, rc2.w/*AFX_MIN(surface->w, wnd->m.frameRc.w)*/);
         rc2.h = AFX_MAX(1, rc2.h/*AFX_MIN(surface->h, wnd->m.frameRc.h)*/);
 
-        if ((wnd->m.areaRc.x != rc2.x) ||
-            (wnd->m.areaRc.y != rc2.y) ||
-            (wnd->m.areaRc.w != rc2.w) ||
-            (wnd->m.areaRc.h != rc2.h))
+        if ((wnd->m.surfaceRc.x != rc2.x) ||
+            (wnd->m.surfaceRc.y != rc2.y) ||
+            (wnd->m.surfaceRc.w != rc2.w) ||
+            (wnd->m.surfaceRc.h != rc2.h))
         {
             afxInt32 extraWndWidth, extraWndHeight;
             CalcWindowValuesW32(wnd->hWnd, &extraWndWidth, &extraWndHeight);
@@ -1401,22 +1965,22 @@ _QOW afxError _QowWndAdjustCb(afxWindow wnd, afxRect const* area)
             wnd->m.frameRc.h = rc2.h + extraWndHeight;
             wnd->m.frameRc.x += rc2.x;
             wnd->m.frameRc.y += rc2.y;
-            wnd->m.areaRc = rc2;
+            wnd->m.surfaceRc = rc2;
 
             if (!SetWindowPos(wnd->hWnd, hWndInsertAfter, wnd->m.frameRc.x, wnd->m.frameRc.y, wnd->m.frameRc.w, wnd->m.frameRc.h, swpFlags))
                 AfxThrowError();
         }
     }
-
-    afxSurface dout = wnd->m.dout;    
+#if 0
+    afxSurface dout = wnd->m.surfaceDout;    
     if (dout)
     {
         AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
 
         afxRect whd;
         AvxGetSurfaceArea(dout, &whd);
-        whd.w = wnd->m.areaRc.w;
-        whd.h = wnd->m.areaRc.h;
+        whd.w = wnd->m.surfaceRc.w;
+        whd.h = wnd->m.surfaceRc.h;
 
         if (AvxAdjustSurface(dout, &whd, wnd->m.fullscreen))
             AfxThrowError();
@@ -1434,19 +1998,20 @@ _QOW afxError _QowWndAdjustCb(afxWindow wnd, afxRect const* area)
         if (AvxAdjustSurface(dout, &whd, wnd->m.fullscreen))
             AfxThrowError();
     }
+#endif
     return err;
 }
 
 _QOW afxBool _QowWndChangeVisibility(afxWindow wnd, afxBool visible)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
     return !!ShowWindow(wnd->hWnd, visible ? SW_SHOW : SW_HIDE);
 }
 
 _QOW afxUnit _QowWndFormatTitleCb(afxWindow wnd)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
@@ -1454,8 +2019,9 @@ _QOW afxUnit _QowWndFormatTitleCb(afxWindow wnd)
     return 0;
 }
 
-_QOW _auxWndDdi const _QOW_WND_IMPL =
+_QOW _auxDdiWnd const _QOW_DDI_WND =
 {
+    .damageCb = _QowWndDamageCb,
     .redrawCb = _QowWndRedrawCb,
     .adjustCb = _QowWndAdjustCb,
     .chIconCb = _QowWndChIconCb,
@@ -1464,7 +2030,7 @@ _QOW _auxWndDdi const _QOW_WND_IMPL =
 
 _QOW afxError _QowWndDtorCb(afxWindow wnd)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
     AFX_ASSERT(AfxGetTid() == AfxGetObjectTid(wnd));
@@ -1487,7 +2053,7 @@ _QOW afxError _QowWndDtorCb(afxWindow wnd)
 
 _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
 {
-    afxError err = AFX_ERR_NONE;
+    afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WND, 1, &wnd);
 
     afxEnvironment env = args[0];
@@ -1511,7 +2077,7 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
         return err;
     }
 
-    wnd->m.pimpl = &_QOW_WND_IMPL;
+    wnd->m.ddi = &_QOW_DDI_WND;
 
     DWORD dwExStyle = WS_EX_APPWINDOW; // Window Extended Style
     DWORD dwStyle = WS_CLIPCHILDREN | WS_CLIPSIBLINGS; // Window Style
@@ -1556,6 +2122,25 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
         wnd->hSurfaceDc = GetDC(hWnd);
         wnd->hWnd = hWnd;
         SetWindowLongPtrA(hWnd, GWLP_USERDATA, (LONG_PTR)wnd);
+
+
+        afxInt32 mleft, mtop, mright, mbottom;
+        GetWindowFrameMargins(wnd->hWnd, &mleft, &mtop, &mright, &mbottom);
+        wnd->m.frameMarginL = mleft;
+        wnd->m.frameMarginT = mtop;
+        wnd->m.frameMarginR = mright;
+        wnd->m.frameMarginB = mbottom;
+
+        MONITORINFO mi = { .cbSize = sizeof(mi) };
+        GetMonitorInfo(MonitorFromWindow(wnd->hWnd, MONITOR_DEFAULTTONEAREST), &mi);
+        afxRect screenRc =
+        {
+            .x = mi.rcWork.left,
+            .y = mi.rcWork.top,
+            .w = mi.rcWork.right - mi.rcWork.left,
+            .h = mi.rcWork.bottom - mi.rcWork.top
+        };
+        wnd->m.screenRc = screenRc;
 
 #if 0
         if (!wnd->m.fullscreen)
@@ -1603,19 +2188,19 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
         if (AvxAcquireSurface(wcfg->dsys, &scfg, &dout)) AfxThrowError();
         else
         {
-            wnd->m.dout = dout;
+            wnd->m.surfaceDout = dout;
 
             afxRect rc = { .x = wcfg->x, .y = wcfg->y, .w = wcfg->dout.ccfg.whd.w, .h = wcfg->dout.ccfg.whd.h };
             rc.w = AFX_MAX(1, rc.w);;
             rc.h = AFX_MAX(1, rc.h);
-            AfxAdjustWindow(wnd, &rc);
+            AfxAdjustWindow(wnd, wnd->m.anchor, &rc);
 #if !0
             if (scfg.presentAlpha && (scfg.presentAlpha != avxVideoAlpha_OPAQUE))
             {
                 DWM_BLURBEHIND bb = { 0 };
                 bb.dwFlags = DWM_BB_ENABLE;
                 bb.fEnable = TRUE;
-                DwmEnableBlurBehindWindow(wnd->hWnd, &(bb)); // ausente no chad Windows XP
+                DwmEnableBlurBehindWindow(wnd->hWnd, &(bb)); // ausent on Windows XP
             }
 #endif
 

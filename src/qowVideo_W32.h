@@ -38,15 +38,16 @@
 #include <d3d9.h>
 #include <dxgi1_2.h>
 
+#define _AUX_UX_C
 #define _AVX_DRAW_C
 #define _AVX_DISPLAY_C
 #define _AVX_DISPLAY_IMPL
 #define _AVX_SURFACE_C
 #define _AVX_SURFACE_IMPL
-#include "../qwadro_afx/src/draw/ddi/avxImplementation.h"
+#include "../qwadro_afx/src/ux/auxIcd.h"
+#include "../qwadro_afx/src/draw/avxIcd.h"
 #include "../../icd_tarzgl4/src/zglDefs.h"
 
-#include "../qwadro_afx/src/ux/impl/auxImplementation.h"
 
 AFX_OBJECT(afxDisplay)
 {
