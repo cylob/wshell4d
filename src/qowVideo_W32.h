@@ -40,25 +40,51 @@
 
 #define _AUX_UX_C
 #define _AVX_DRAW_C
-#define _AVX_DISPLAY_C
-#define _AVX_DISPLAY_IMPL
+#define _AUX_DISPLAY_C
+#define _AUX_DISPLAY_IMPL
 #define _AVX_SURFACE_C
 #define _AVX_SURFACE_IMPL
-#include "../qwadro_afx/src/ux/auxIcd.h"
-#include "../qwadro_afx/src/draw/avxIcd.h"
+#include "../qwadro_afx/mmux/auxIcd.h"
+#include "../qwadro_afx/targa/avxIcd.h"
 #include "../../icd_tarzgl4/src/zglDefs.h"
 
+#define USE_DXGI_DISPLAY 1
+#define USE_GDI_DISPLAY 1
+
+AFX_OBJECT(afxDisplayPort)
+{
+    AFX_OBJECT(_auxDisplayPort) m;
+#if USE_DXGI_DISPLAY
+    IDXGIOutput* pDxgiOutput;
+    UINT dxgiOutputIndex; // Should be the same as Qwadro's display port ordinal number.
+    DXGI_OUTPUT_DESC dxgiDesc;
+#endif
+#if USE_GDI_DISPLAY
+    HMONITOR hMon;
+    DISPLAY_DEVICEA ddminfo;
+#endif
+};
+
+typedef enum qowDisplayType
+{
+    qowDisplayType_DXGI,
+    qowDisplayType_GDI
+} qowDisplayType;
 
 AFX_OBJECT(afxDisplay)
 {
-    AFX_OBJECT(_avxDisplay) m;
+    AFX_OBJECT(_auxDisplay) m;
 
+    qowDisplayType type;
+#if USE_DXGI_DISPLAY
+    IDXGIFactory* pDxgiFactory; // Could be moved to environment to avoid span and improve resource utilization.
+    IDXGIAdapter* pDxgiAdapter;
+    UINT dxgiAdapterIndex;
+#endif
+
+#if USE_GDI_DISPLAY
     DISPLAY_DEVICEA ddinfo;
-    struct
-    {
-        HMONITOR hMon;
-        DISPLAY_DEVICEA ddminfo;
-    } ports[2];
+#endif
 };
 
 AFX_OBJECT(afxSurface)
@@ -97,6 +123,7 @@ AFX_OBJECT(afxSurface)
                 afxBool8 swapFboReady;
             } *swaps;
             afxBool swapOnWgl;
+            void(*WINAPI AddSwapHintRectWIN)(GLint x, GLint y, GLsizei width, GLsizei height);
         } wgl;
         struct
         {
@@ -127,13 +154,14 @@ AFX_OBJECT(afxSurface)
     };
 };
 
-QOW afxError _ZglVduDtorCb(afxDisplay vdu);
-QOW afxError _ZglVduCtorCb(afxDisplay vdu, void** args, afxUnit invokeNo);
 QOW afxResult _ZglVduIoctrlCb(afxDisplay vdu, afxUnit reqCode, va_list va);
 
 BOOL GetMonitorNameFromHMONITOR(HMONITOR hMonitor, char* outName, size_t outNameSize);
 BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);
 
 afxError RegisterPresentVdus(afxModule icd);
+
+QOW afxError _QowDpyDtorCb(afxDisplay dpy);
+QOW afxError _QowDpyCtorCb(afxDisplay dpy, void** args, afxUnit invokeNo);
 
 #endif//QOW_VIDEO_H

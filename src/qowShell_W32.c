@@ -25,7 +25,7 @@
 #include "qowBase.h"
 #include "qowVideo_W32.h"
 #include "qowAudio_W32.h"
-#include "../qwadro_afx/src/draw/avxSurfaceImpl.h"
+#include "../qwadro_afx/targa/avxSurfaceDDK.h"
 //#include "../qwadro_afx/src/mix/ddi/avxImpl_Sink.h"
 
 QOW afxError _QowDoutDtorCb_GDI(afxSurface dout);
@@ -40,7 +40,7 @@ afxError getInteropDoutCls(afxDrawSystem dsys, afxString const* tool, afxClassCo
 
     if (0 == AfxCompareString(tool, 0, "wgl", 0, FALSE))
     {
-        afxClassConfig doutClsCfg = _AVX_DOUT_CLASS_CONFIG;
+        afxClassConfig doutClsCfg = _AVX_CLASS_CONFIG_DOUT;
         doutClsCfg.fixedSiz = sizeof(AFX_OBJ(afxSurface));
         doutClsCfg.ctor = (void*)_ZglDoutCtorCb;
         doutClsCfg.dtor = (void*)_ZglDoutDtorCb;
@@ -52,7 +52,7 @@ afxError getInteropDoutCls(afxDrawSystem dsys, afxString const* tool, afxClassCo
                 (0 == AfxCompareString(tool, 0, "sw", 0, FALSE)) ||
                 (0 == AfxCompareString(tool, 0, "", 0, FALSE)))
     {
-        afxClassConfig doutClsCfg = _AVX_DOUT_CLASS_CONFIG;
+        afxClassConfig doutClsCfg = _AVX_CLASS_CONFIG_DOUT;
         doutClsCfg.fixedSiz = sizeof(AFX_OBJ(afxSurface));
         doutClsCfg.ctor = (void*)_QowDoutCtorCb_GDI;
         doutClsCfg.dtor = (void*)_QowDoutDtorCb_GDI;
@@ -79,8 +79,8 @@ afxError getInteropSinkCls(afxMixSystem msys, afxString const* tool, afxClassCon
     {
         afxClassConfig sinkClsCfg = _AMX_ASIO_CLASS_CONFIG;
         sinkClsCfg.fixedSiz = sizeof(AFX_OBJ(afxSink));
-        sinkClsCfg.ctor = (void*)_QowAsioCtorCb;
-        sinkClsCfg.dtor = (void*)_QowAsioDtorCb;
+        sinkClsCfg.ctor = (void*)_QowSinkCtorCb;
+        sinkClsCfg.dtor = (void*)_QowSinkDtorCb;
         *cfg = sinkClsCfg;
     }
     else
@@ -96,23 +96,23 @@ _QOW afxError afxIcdHook(afxModule icd, afxUri const* manifest)
     afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_MDLE, 1, &icd);
 
-    afxClassConfig sesClsCfg = _AUX_ENV_CLASS_CONFIG;
-    sesClsCfg.fixedSiz = sizeof(AFX_OBJ(afxEnvironment));
-    sesClsCfg.ctor = (void*)_QowEnvCtorCb;
-    sesClsCfg.dtor = (void*)_QowEnvDtorCb;
+    afxClassConfig envClsCfg = _AUX_ENV_CLASS_CONFIG;
+    envClsCfg.fixedSiz = sizeof(AFX_OBJ(afxEnvironment));
+    envClsCfg.ctor = (void*)_QowEnvCtorCb;
+    envClsCfg.dtor = (void*)_QowEnvDtorCb;
 
-    afxClassConfig vduClsCfg = _AVX_VDU_CLASS_CONFIG;
-    vduClsCfg.fixedSiz = sizeof(AFX_OBJ(afxDisplay));
-    vduClsCfg.ctor = (void*)_ZglVduCtorCb;
-    vduClsCfg.dtor = (void*)_ZglVduDtorCb;
+    afxClassConfig dpyClsCfg = _AUX_DPY_CLASS_CONFIG;
+    dpyClsCfg.fixedSiz = sizeof(AFX_OBJ(afxDisplay));
+    dpyClsCfg.ctor = (void*)_QowDpyCtorCb;
+    dpyClsCfg.dtor = (void*)_QowDpyDtorCb;
 
-    _afxShellImpl impl = { 0 };
-    impl.vduCls = vduClsCfg;
-    impl.sesCls = sesClsCfg;
+    _auxImplementation impl = { 0 };
+    impl.dpyCls = dpyClsCfg;
+    impl.envCls = envClsCfg;
     impl.getInteropDoutCls = getInteropDoutCls;
     impl.getInteropSinkCls = getInteropSinkCls;
 
-    _AuxImplementShell(icd, &impl);
+    _AuxIcdImplement(icd, &impl);
 
     RegisterPresentVdus(icd);
 

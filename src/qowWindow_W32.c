@@ -539,12 +539,12 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
 
         POINTS points = MAKEPOINTS(lParam);
 
-        afxV2d curr = { AFX_R(points.x), AFX_R(points.y) };
+        afxV2d curr = { AFX_REAL(points.x), AFX_REAL(points.y) };
 
         AfxV2dSub(wnd->m.cursMove, wnd->m.cursPos, curr);
         AfxV2dCopy(wnd->m.cursPos, curr);
 
-        afxV2d screen = { AFX_R(wnd->m.frameRc.w), AFX_R(wnd->m.frameRc.h) };
+        afxV2d screen = { AFX_REAL(wnd->m.frameRc.w), AFX_REAL(wnd->m.frameRc.h) };
 
         AfxV2dNdc(wnd->m.cursPosNdc, wnd->m.cursPos, screen);
         AfxV2dNdc(wnd->m.cursMoveNdc, wnd->m.cursMove, screen);
@@ -846,30 +846,36 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         case WMSZ_LEFT:
         case WMSZ_BOTTOMLEFT:
         {
-            rcInOut->bottom = rcInOut->top + 
-                (frame.bottom - frame.top) +
+            rcInOut->bottom = rcInOut->top + (frame.bottom - frame.top) +
                 (int)(((rcInOut->right - rcInOut->left) - (frame.right - frame.left)) / ratio);
             break;
         }
         case WMSZ_TOPRIGHT:
         case WMSZ_TOPLEFT:
         {
-            rcInOut->top = rcInOut->bottom - 
-                (frame.bottom - frame.top) -
+            rcInOut->top = rcInOut->bottom - (frame.bottom - frame.top) -
                 (int)(((rcInOut->right - rcInOut->left) - (frame.right - frame.left)) / ratio);
             break;
         }
         case WMSZ_BOTTOM:
         case WMSZ_TOP:
         {
-            rcInOut->right = rcInOut->left + 
-                (frame.right - frame.left) +
+            rcInOut->right = rcInOut->left + (frame.right - frame.left) +
                 (int)(((rcInOut->bottom - rcInOut->top) - (frame.bottom - frame.top)) * ratio);
             break;
         }
-        default:
-            break;
+        default: break;
         }
+#if 0
+        if (!wnd->m.adjusting)
+        {
+            auxEvent ev = { 0 };
+            ev.ev.id = afxEvent_UX;
+            ev.wnd = wnd;
+            ev.id = auxEventId_EDGE;
+            AfxEmitEvent(wnd, &ev);
+        }
+#endif
         break;
     }
     case WM_SIZE:
@@ -949,7 +955,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
             ev.ev.id = afxEvent_UX;
             ev.wnd = wnd;
             ev.id = auxEventId_SIZE;
-            AfxEmitEvent(wnd, &ev);
+            AfxEmitEvent(wnd, &ev.ev);
         }
         break;
     }
@@ -1095,7 +1101,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         afxSurface dout = wnd->m.surfaceDout;
         AvxCallSurfaceEndpoint(dout, 0, &dc);
         avxRange const resolution = { GetDeviceCaps(dc, HORZRES), GetDeviceCaps(dc, VERTRES), GetDeviceCaps(dc, PLANES) };
-        afxReal64 physAspRatio = AvxFindPhysicalAspectRatio(GetDeviceCaps(dc, HORZSIZE), GetDeviceCaps(dc, VERTSIZE));
+        afxReal64 physAspRatio = AfxFindPhysicalAspectRatio(GetDeviceCaps(dc, HORZSIZE), GetDeviceCaps(dc, VERTSIZE));
         afxReal refreshRate = GetDeviceCaps(dc, VREFRESH);
 
         avxModeSetting mode = { 0 };
@@ -1229,7 +1235,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
         }
 #endif
 
-        _AfxEnvFocusWindowCb(env, NIL, NIL);
+        _AfxEnvFocusWindowCb(env, 0, NIL, NIL);
 
         //ShakeWindow(wnd);
 
@@ -1281,7 +1287,7 @@ _QOW LRESULT WINAPI _QowWndHndlngPrcW32Callback(HWND hWnd, UINT message, WPARAM 
             }
         }
 
-        _AfxEnvFocusWindowCb(env, wnd, NIL);
+        _AfxEnvFocusWindowCb(env, 0, wnd, NIL);
 
         break;
     }
@@ -2066,6 +2072,10 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
         return err;
     }
 
+    afxDisplay disp = wcfg->disp;
+    AFX_TRY_ASSERT_OBJECTS(afxFcc_VDU, 1, &disp);
+    afxUnit dispPort = wcfg->dport;
+
     afxClassConfig widClsCfg = _AUX_WID_CLASS_CONFIG;
     widClsCfg.fixedSiz = sizeof(AFX_OBJ(afxWidget));
     widClsCfg.ctor = (void*)_QowWidCtorCb;
@@ -2111,7 +2121,7 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
     wnd->dwExStyle = dwExStyle;
     wnd->dwStyle = dwStyle;
 
-    HWND hWnd = CreateWindowExA(dwExStyle, env->wndClss.lpszClassName, env->wndClss.lpszClassName, 
+    HWND hWnd = CreateWindowExA(dwExStyle, env->wndClss.lpszClassName, wnd->m.title.s.start, 
                                 dwStyle, wcfg->x, wcfg->y, 1, 1, NIL, NIL, env->wndClss.hInstance, NIL);
 
     if (!hWnd) AfxThrowError();
@@ -2193,7 +2203,7 @@ _QOW afxError _QowWndCtorCb(afxWindow wnd, void** args, afxUnit invokeNo)
             afxRect rc = { .x = wcfg->x, .y = wcfg->y, .w = wcfg->dout.ccfg.whd.w, .h = wcfg->dout.ccfg.whd.h };
             rc.w = AFX_MAX(1, rc.w);;
             rc.h = AFX_MAX(1, rc.h);
-            AfxAdjustWindow(wnd, wnd->m.anchor, &rc);
+            AfxAdjustWindow(wnd, disp, dispPort, wnd->m.anchor, &rc);
 #if !0
             if (scfg.presentAlpha && (scfg.presentAlpha != avxVideoAlpha_OPAQUE))
             {

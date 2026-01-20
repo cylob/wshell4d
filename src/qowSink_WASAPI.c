@@ -18,7 +18,7 @@
 #include "../../icd_amiga/src/zalInteropWasapi.h"
 //#include "qowBase.h"
 
-_QOW afxError _QowAsioLockCb(afxSink asi, afxUnit64 timeout, afxUnit minFrameCnt, amxBufferedTrack* room)
+_QOW afxError _QowSinkLockCb(afxSink asi, afxUnit64 timeout, afxMask exuMask, afxUnit minFrameCnt, amxBufferedTrack* room)
 {
     afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
@@ -34,7 +34,7 @@ _QOW afxError _QowAsioLockCb(afxSink asi, afxUnit64 timeout, afxUnit minFrameCnt
     return err;
 }
 
-_QOW afxError _QowAsioUnlockCb(afxSink asi, afxFlags flags)
+_QOW afxError _QowSinkUnlockCb(afxSink asi, afxFlags flags)
 {
     afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
@@ -52,7 +52,7 @@ _QOW afxError _QowAsioUnlockCb(afxSink asi, afxFlags flags)
     return err;
 }
 
-_QOW void _QowAsioFlushCb(afxSink asi)
+_QOW void _QowSinkFlushCb(afxSink asi)
 {
     afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
@@ -94,7 +94,7 @@ _QOW void _QowAsioFlushCb(afxSink asi)
     }
 }
 
-_QOW afxError _QowAsioDtorCb(afxSink asi)
+_QOW afxError _QowSinkDtorCb(afxSink asi)
 {
     afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
@@ -109,7 +109,7 @@ _QOW afxError _QowAsioDtorCb(afxSink asi)
     return err;
 }
 
-_QOW afxError _QowAsioCtorCb(afxSink asi, void** args, afxUnit invokeNo)
+_QOW afxError _QowSinkCtorCb(afxSink asi, void** args, afxUnit invokeNo)
 {
     afxResult err = NIL;
     AFX_ASSERT_OBJECTS(afxFcc_ASIO, 1, &asi);
@@ -138,9 +138,9 @@ _QOW afxError _QowAsioCtorCb(afxSink asi, void** args, afxUnit invokeNo)
     if (_ZalWasapiCreate(&asi->idd.wasapi, asi->m.fmt, asi->m.chanCnt, asi->m.freq))
         AfxThrowError();
 
-    asi->m.flushCb = _QowAsioFlushCb;
-    asi->m.lockCb = _QowAsioLockCb;
-    asi->m.unlockCb = _QowAsioUnlockCb;
+    asi->m.flushCb = _QowSinkFlushCb;
+    asi->m.lockCb = _QowSinkLockCb;
+    asi->m.unlockCb = _QowSinkUnlockCb;
 
     _ZalWasapiStartStop(&asi->idd.wasapi, TRUE);
 

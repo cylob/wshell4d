@@ -275,7 +275,7 @@ _QOW void _DecodeSubnodes(Wpu* dpu, _auxGuiElem* parent)
             break;
         }
 
-        //if (cmdb->state != avxDrawContextState_PENDING)
+        //if (cmdb->state != avxContextState_PENDING)
         {
             //AfxThrowError();
             //break;
@@ -315,7 +315,7 @@ _QOW afxError _QowWidUpdateCb(afxWidget wid)
             continue;
         }
 
-        //if (cmdb->state != avxDrawContextState_PENDING)
+        //if (cmdb->state != avxContextState_PENDING)
         {
             //AfxThrowError();
             //break;
@@ -333,7 +333,7 @@ _QOW afxError _QowWidRenderCb(afxWidget wid, afxRect const* area, afxDrawContext
     afxError err = { 0 };
     AFX_ASSERT_OBJECTS(afxFcc_WID, 1, &wid);
 
-    //wid->m.updateCb(wid, 0);
+    wid->m.updateCb(wid, 0);
 
     nk_afx_render(&wid->idd, NK_ANTI_ALIASING_OFF, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER, dctx);
 

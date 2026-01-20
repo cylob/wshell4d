@@ -22,20 +22,29 @@
 #include "qowBase.h"
 #include "qowVideo_W32.h"
 
+#define _ALLOW_TEARING_CONTROL TRUE
+//#define _ALLOW_FLOAT_TYPE_BUFFER TRUE
+//#define _ALLOW_SINGLE_BUFFER TRUE
+//#define _FORCE_SWAP_METHOD_EXCHANGE TRUE
+//#define _FORCE_DISABLE_WGL_INTEROPS TRUE
+//#define _FORCE_DISABLE_DEPTH_BUFFERS
+//#define _FORCE_DISABLE_AUX_BUFFERS
 //#define _NEVER_RESTORE_WGL_CONTEXT TRUE
 #define _ALWAYS_RESTORE_WGL_CONTEXT TRUE
 //#define _NEVER_FLUSH_DWM TRUE
-//#define _ALWAYS_FLUSH_DWM TRUE
+#define _ALWAYS_FLUSH_DWM TRUE
 //#define _ALWAYS_FLUSH_DWM_FSE TRUE
 #define _SWAP_BUFFERS_WITH_WGL TRUE
+#define _SWAP_BUFFERS_WITH_HINT TRUE
 #define _SWAP_BUFFERS_WITH_GDI TRUE
-#define _CLEAR_BUFFERS_WITH_COLOR TRUE
+#define _INVALIDATE_BUFFERS TRUE
+//#define _CLEAR_BUFFERS_WITH_COLOR TRUE
 //#define _CLEAR_BUFFERS_WITH_BLACK TRUE
-//#define _UNBIND_BLIT_SRC_FBO TRUE
-//#define _UNBIND_BLIT_DST_FBO TRUE
+//#define _UNBIND_BLIT_SRC_FBO TRUE // Irrelevant whether we are unbinding the context.
+//#define _UNBIND_BLIT_DST_FBO TRUE // Irrelevant whether we are unbinding the context.
 //#define _FLUSH_AFTER_BLIT_FBO TRUE
 //#define _YIELD_AFTER_SWAP_BUFFERS TRUE
-//#define _SLEEP_AFTER_SWAP_BUFFERS TRUE
+//#define _SLEEP_AFTER_SWAP_BUFFERS TRUE // Yeild can not really yield to one another thread in certaine concurrency policies.
 #ifdef _SLEEP_AFTER_SWAP_BUFFERS
 #define _SLEEP_TIME_AFTER_SWAP_BUFFERS 2 // ms
 #endif//_SLEEP_AFTER_SWAP_BUFFERS
@@ -70,6 +79,372 @@ _QOW afxUnit _ZglDoutResumeFunction(afxSurface dout)
     return suspendCnt;
 }
 
+_QOWINL afxError _QowDoutFindPixelFormat(afxSurface dout)
+{
+    afxError err = { 0 };
+    AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
+
+    if (dout->dcPixFmt)
+    {
+        AfxThrowError();
+        return err;
+    }
+
+    avxFormatDescription pfd;
+    AvxDescribeFormats(1, &dout->m.ccfg.bins[0].fmt, &pfd);
+
+    int pxlAttrPairCnt = 0;
+    int pxlAttrPairs[][2] =
+    {
+        { WGL_SUPPORT_OPENGL_ARB, GL_TRUE }, // suportar o que se não OpenGL na fucking API do OpenGL???
+        { WGL_DRAW_TO_WINDOW_ARB, GL_TRUE },
+
+#ifdef _FORCE_DISABLE_WGL_INTEROPS
+        { WGL_SUPPORT_GDI_ARB, GL_FALSE },
+        { WGL_DRAW_TO_PBUFFER_ARB, GL_FALSE },
+        { WGL_DRAW_TO_BITMAP_ARB, GL_FALSE },
+        { WGL_BIND_TO_TEXTURE_RGB_ARB, GL_FALSE },
+        { WGL_BIND_TO_TEXTURE_RGBA_ARB, GL_FALSE },
+#endif
+        { WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB },
+
+#ifdef _ALLOW_SINGLE_BUFFER
+        { WGL_DOUBLE_BUFFER_ARB, (dout->swapCnt > 1) }, // single buffered is not supported by drivers today. Qwadro will just virtualizes it.
+#else
+        { WGL_DOUBLE_BUFFER_ARB, GL_TRUE }, // single buffered is not supported by drivers today. Qwadro will just virtualizes it.
+#endif
+
+#ifdef _ALLOW_FLOAT_TYPE_BUFFER
+        { WGL_PIXEL_TYPE_ARB, (pfd.type[0] == avxFormatType_F) ? WGL_TYPE_RGBA_FLOAT_ARB : WGL_TYPE_RGBA_ARB },
+#else
+        { WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB },
+#endif
+
+#ifdef _FORCE_SWAP_METHOD_EXCHANGE
+        /*
+            WGL_SWAP_METHOD_ARB
+            If the pixel format supports a back buffer, then this indicates
+            how they are swapped. If this attribute is set to
+            WGL_SWAP_EXCHANGE_ARB then swapping exchanges the front and back
+            buffer contents; if it is set to WGL_SWAP_COPY_ARB then swapping
+            copies the back buffer contents to the front buffer; if it is
+            set to WGL_SWAP_UNDEFINED_ARB then the back buffer contents are
+            copied to the front buffer but the back buffer contents are
+            undefined after the operation. If the pixel format does not
+            support a back buffer then this parameter is set to
+            WGL_SWAP_UNDEFINED_ARB. The <iLayerPlane> parameter is ignored
+            if this attribute is specified.
+        */
+        { WGL_SWAP_METHOD_ARB, WGL_SWAP_EXCHANGE_ARB },
+#endif
+        /*
+            WGL_COLOR_BITS_ARB
+            The number of color bitplanes in each color buffer. For RGBA pixel types,
+            it is the size of the color buffer, "excluding" the alpha bitplanes.
+            For color-index pixels, it is the size of the color index buffer.
+        */
+
+        // ARGB8
+        { WGL_COLOR_BITS_ARB, pfd.bpp - pfd.bpc[3] }, // WGL_COLOR_BITS_ARB must not include alpha bits.
+        { WGL_ALPHA_BITS_ARB, pfd.bpc[3] },
+#if !0
+        { WGL_RED_BITS_ARB, pfd.bpc[0] },
+        { WGL_GREEN_BITS_ARB, pfd.bpc[1] },
+        { WGL_BLUE_BITS_ARB, pfd.bpc[2] },
+#endif
+
+#if !0
+        { WGL_ALPHA_SHIFT_ARB, pfd.swizzle[3] },
+        { WGL_RED_SHIFT_ARB, pfd.swizzle[0] },
+        { WGL_GREEN_SHIFT_ARB, pfd.swizzle[1] },
+        { WGL_BLUE_SHIFT_ARB, pfd.swizzle[2] },
+#endif
+
+#ifdef _FORCE_DISABLE_DEPTH_BUFFERS
+        { WGL_DEPTH_BITS_ARB, 0 }, // No Qwadro, não é possível desenhar arbitrariamente no default framebuffer. Logo, não há necessidade de stencil.
+        { WGL_STENCIL_BITS_ARB, 0 },  // No Qwadro, não é possível desenhar arbitrariamente no default framebuffer. Logo, não há necessidade de stencil.
+#endif
+
+#ifdef _FORCE_DISABLE_AUX_BUFFERS
+        { WGL_AUX_BUFFERS_ARB, dout->m.bufCnt },
+        { WGL_ACCUM_BITS_ARB, 0 },
+        { WGL_ACCUM_ALPHA_BITS_ARB, 0 },
+        { WGL_ACCUM_RED_BITS_ARB, 0 },
+        { WGL_ACCUM_GREEN_BITS_ARB, 0 },
+        { WGL_ACCUM_BLUE_BITS_ARB, 0 },
+#endif
+        { WGL_TRANSPARENT_ARB, (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE)) },
+        //{ WGL_SAMPLE_BUFFERS_ARB,  GL_FALSE },  // works on Intel, didn't work on Mesa
+        //{ WGL_SAMPLES_ARB, 0 }, // works on Intel, didn't work on Mesa
+        //{ WGL_COLORSPACE_EXT, dout->colorSpc == avxColorSpace_STANDARD ? WGL_COLORSPACE_SRGB_EXT : (dout->colorSpc == avxColorSpace_LINEAR ? WGL_COLORSPACE_LINEAR_EXT : NIL) }, // works on Mesa, didn't work on Intel
+        { WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB, (pfd.flags & avxFormatFlag_sRGB) }, // works on Mesa, didn't work on Intel
+#if 0
+        { WGL_NUMBER_OVERLAYS_ARB, 0 },
+        { WGL_NUMBER_UNDERLAYS_ARB, 0 },
+
+        { WGL_SHARE_DEPTH_ARB, FALSE },
+        { WGL_SHARE_STENCIL_ARB, FALSE },
+        { WGL_SHARE_ACCUM_ARB, FALSE },
+
+        { WGL_STEREO_ARB, FALSE },
+#endif
+        { NIL, NIL },
+    };
+
+    UINT fmtCnt;
+
+    //if (!wglChooseBestPixelFormatSIG(dout->hDC, &pxlAttrPairs[0][0], 0, 1, &dout->dcPixFmt, &fmtCnt)) AfxThrowError();
+    if (!wglChoosePixelFormatARB(dout->hDC, &pxlAttrPairs[0][0], 0, 1, &dout->dcPixFmt, &fmtCnt))
+    {
+        AfxThrowError();
+    }
+    else
+    {
+        AFX_ASSERT(dout->dcPixFmt);
+        AFX_ASSERT(fmtCnt);
+#if 0
+        pfd.nSize = sizeof(pfd);
+        pfd.nVersion = 1;
+        pfd.dwFlags = PFD_DOUBLEBUFFER | PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DIRECT3D_ACCELERATED | PFD_SUPPORT_COMPOSITION;
+        pfd.iPixelType = PFD_TYPE_RGBA;
+        pfd.cColorBits = 24;
+        pfd.cAlphaBits = 8;
+        pfd.cDepthBits = 24;
+        pfd.cStencilBits = 8;
+#endif
+        // The flag PFD_DIRECT3D_ACCELERATED is not an error, and it doesn't mean that you're using Direct3D instead of OpenGL. 
+        // It's part of how WDDM (Windows Display Driver Model) drivers report capabilities.
+        // So the flag PFD_DIRECT3D_ACCELERATED just means that the format is accelerated by the GPU, 
+        // and possibly usable via Direct3D as well --- it's a driver hint, not a directive.
+        //dout->wglDcPxlFmt = _ZglChoosePixelFormat(dout->wglDc, &(pfd));
+        DWORD pfdFlags = PFD_DOUBLEBUFFER | PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL
+#ifdef _FORCE_SWAP_METHOD_EXCHANGE
+            | PFD_SWAP_EXCHANGE
+#endif
+#if 0
+            | PFD_DIRECT3D_ACCELERATED
+#endif
+#if 0
+            | PFD_SUPPORT_COMPOSITION
+#endif
+            ;
+
+        if (!wglDescribePixelFormatWIN(dout->hDC, dout->dcPixFmt, sizeof(dout->dcPfd), &dout->dcPfd))
+        {
+            if (!DescribePixelFormat(dout->hDC, dout->dcPixFmt, sizeof(dout->dcPfd), &dout->dcPfd))
+                AfxThrowError();
+            else if (!SetPixelFormat(dout->hDC, dout->dcPixFmt, &dout->dcPfd))
+                AfxThrowError();
+        }
+        else
+        {
+            if (!wglSetPixelFormatWIN(dout->hDC, dout->dcPixFmt, &dout->dcPfd))
+                if (!SetPixelFormat(dout->hDC, dout->dcPixFmt, &dout->dcPfd))
+                    AfxThrowError();
+        }
+
+        AFX_ASSERT(dout->dcPfd.dwFlags & pfdFlags);
+    }
+    return err;
+}
+
+_QOWINL afxError _QowDoutUpdateSwapControl(afxSurface dout)
+{
+    afxError err = { 0 };
+    AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
+
+    /*
+        wglSwapIntervalEXT(0) disables VSync.
+        The GPU is allowed to present frames as fast as it can, without waiting for the monitor's refresh.
+        Result:
+            Maximum FPS
+            Possible screen tearing
+            Lowest input latency (unless GPU is overloaded)
+
+        wglSwapIntervalEXT(-1) requests "Adaptive VSync" (supported only by NVIDIA drivers).
+        Behavior:
+            When FPS >= monitor refresh rate -> VSync ON, no tearing.
+            When FPS < monitor refresh rate -> VSync OFF, reduces stutter from VSync stalls.
+        Result:
+            Less stuttering than traditional VSync when FPS dips.
+            Can still tear during low-FPS periods.
+            Works only if the driver supports adaptive VSync via the extension.
+    */
+
+    AFX_ASSERT(_WGL_EXT_swap_control);
+    if (_WGL_EXT_swap_control)
+    {
+        if ((dout->m.presentMode & avxPresentFlag_RATE_LIMITED))
+        {
+            // When greater than 0 can causes lag.
+            // It enables vsync (waits for vertical retrace).
+            // When >1, waits for multiple retraces.
+            wglSwapIntervalEXT(1);
+        }
+        else
+        {
+#ifndef _ALLOW_TEARING_CONTROL
+            // When tested on Intel iGPU, wglSwapIntervalEXT(-1) seem to be disallowing tearing.
+            // But I need to profile it.
+            wglSwapIntervalEXT(0);
+#else
+            if ((dout->m.presentMode & avxPresentFlag_NO_TEARING) && _WGL_EXT_swap_control_tear)
+            {
+                wglSwapIntervalEXT(-1);
+            }
+            else
+            {
+                // It disables vsync (immediate swapping).
+                wglSwapIntervalEXT(0);
+            }
+#endif
+        }
+    }
+    return err;
+}
+
+_QOW afxError _ZglDoutCapture_WGL(afxDrawQueue dque, avxCaption* ctrl)
+{
+    afxError err = { 0 };
+
+    afxSurface dout = ctrl->dout;
+    afxUnit bufIdx = ctrl->bufIdx;
+    AFX_ASSERT_OBJECTS(afxFcc_DOUT, 1, &dout);
+
+    HDC bkpHdc = wglGetCurrentDCWIN();
+    HGLRC bkpGlrc = wglGetCurrentContextWIN();
+    afxBool mustRestoreCtx = FALSE;
+
+    if (bkpHdc != dout->hDC)
+    {
+        if (!wglMakeCurrentWIN(dout->hDC, dout->wgl.hSwapRC))
+        {
+            AfxThrowError();
+            return err;
+        }
+        mustRestoreCtx = TRUE;
+    }
+
+    glVmt const* gl = dout->wgl.gl;
+
+    if (ctrl->wait)
+    {
+        avxFence fenc = ctrl->wait;
+        // Just a copy of _DpuWaitForFence, just because we are not the DPU here.
+        afxUnit64 oldVal = 0;
+        if (ctrl->waitValue == (oldVal = (afxUnit64)AfxLoadAtom64(&fenc->m.value)))
+        {
+            GLsync glHandle = AfxLoadAtomPtr(&fenc->glHandleAtom);
+
+            if (glHandle)
+            {
+                AFX_ASSERT(gl->IsSync(glHandle));
+                //AFX_ASSERT(fenc->glHandle == glHandle);
+                //gl->WaitSync(glHandle, GL_NONE, GL_TIMEOUT_IGNORED);
+            }
+        }
+    }
+
+    avxRaster buf;
+    AvxGetSurfaceBuffer(dout, bufIdx, &buf);
+    AFX_ASSERT_OBJECTS(afxFcc_RAS, 1, &buf);
+
+    if (buf->glHandle)
+    {
+#ifdef _SWAP_BUFFERS_WITH_WGL
+
+        if (dout->wgl.swapOnWgl)
+        {
+            wglSwapBuffersWIN(dout->hDC);
+        }
+        else
+#endif//_SWAP_BUFFERS_WITH_WGL
+        {
+            SwapBuffers(dout->hDC);
+        }
+
+        if (!dout->wgl.swaps[bufIdx].swapFboReady)
+        {
+            // deferred regen because we need a context.
+            if (!dout->wgl.swaps[bufIdx].swapFbo)
+            {
+                gl->GenFramebuffers(1, &dout->wgl.swaps[bufIdx].swapFbo); _ZglThrowErrorOccuried();
+                gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, dout->wgl.swaps[bufIdx].swapFbo); _ZglThrowErrorOccuried();
+                AFX_ASSERT(gl->IsFramebuffer(dout->wgl.swaps[bufIdx].swapFbo));
+            }
+            else
+            {
+                AFX_ASSERT(gl->IsFramebuffer(dout->wgl.swaps[bufIdx].swapFbo));
+                gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, dout->wgl.swaps[bufIdx].swapFbo); _ZglThrowErrorOccuried();
+            }
+            _ZglBindFboAttachment(gl, GL_DRAW_FRAMEBUFFER, NIL, GL_COLOR_ATTACHMENT0, buf->glTarget, buf->glHandle, 0, 0, FALSE);
+            dout->wgl.swaps[bufIdx].swapFboReady = TRUE;
+        }
+        else
+        {
+            AFX_ASSERT(gl->IsFramebuffer(dout->wgl.swaps[bufIdx].swapFbo));
+            gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, dout->wgl.swaps[bufIdx].swapFbo); _ZglThrowErrorOccuried();
+        }
+
+        static GLbitfield const clearBitmask = GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT*/;
+        static GLenum const invBufs[] =
+        {
+            GL_COLOR,
+            GL_DEPTH,
+            GL_STENCIL
+        };
+
+        gl->InvalidateFramebuffer(GL_DRAW_FRAMEBUFFER, /*ARRAY_SIZE(invBufs)*/ 1, invBufs); _ZglThrowErrorOccuried();
+        gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried();
+
+        afxLayeredRect rc = dout->m.swaps[bufIdx].bounds;
+
+        gl->BlitFramebuffer(0, 0, rc.area.w, rc.area.h, rc.area.x, rc.area.y, rc.area.w, rc.area.h, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
+        gl->Flush();
+
+    }
+
+    if (ctrl->signal)
+    {
+        avxFence fenc = ctrl->signal;
+        AvxSignalFence(fenc, ctrl->signalValue);
+#if 0
+        afxUnit64 oldVal = 0;
+        if (ctrl->signalValue > (oldVal = (afxUnit64)AfxLoadAtom64(&fenc->m.value)))
+        {
+            AvxSignalFence(fenc, ctrl->signalValue);
+#if 0
+            // Just a copy of _DpuSignalFence, just because we are not the DPU.
+            avxFence fenc = ctrl->signal;
+            GLsync glHandle = gl->FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            AFX_ASSERT(gl->IsSync(glHandle));
+            glHandle = AfxExchangeAtomPtr(&fenc->glHandleAtom, glHandle);
+            if (glHandle)
+            {
+                AFX_ASSERT(gl->IsSync(glHandle));
+                //AFX_ASSERT(fenc->glHandle == glHandle);
+                gl->DeleteSync(glHandle);
+            }
+            // We are not a DPU, we have to busy-wait if needed.
+            //AfxPushLink(&fenc->onSignalChain, &dpu->fenceSignalChain);
+#endif
+        }
+#endif
+    }
+
+#ifndef _NEVER_RESTORE_WGL_CONTEXT
+#ifndef _ALWAYS_RESTORE_WGL_CONTEXT
+    if (mustRestoreCtx)
+#endif//_ALWAYS_UNBIND_WGL_CONTEXT
+    {
+        if (!wglMakeCurrentWIN(bkpHdc, bkpGlrc))
+        {
+            AfxThrowError();
+        }
+    }
+#endif//_NEVER_RESTORE_WGL_CONTEXT
+}
+
 _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 {
     afxError err = { 0 };
@@ -96,30 +471,36 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 
     glVmt const* gl = dout->wgl.gl;
 
-    afxLayeredRect rc;
-    avxRaster buf;
-    avxCanvas canv;
-    AvxGetSurfaceBuffer(dout, bufIdx, &buf);
-    AvxGetSurfaceCanvas(dout, bufIdx, &canv, &rc);
-    AFX_ASSERT_OBJECTS(afxFcc_CANV, 1, &canv);
-    AFX_ASSERT_OBJECTS(afxFcc_RAS, 1, &buf);
-
-    if (buf->glHandle)
+    if (ctrl->wait)
     {
-        if (ctrl->wait)
+        avxFence fenc = ctrl->wait;
+        // Just a copy of _DpuWaitForFence, just because we are not the DPU here.
+        afxUnit64 oldVal = 0;
+        if (ctrl->waitValue == (oldVal = (afxUnit64)AfxLoadAtom64(&fenc->m.value)))
         {
-            // Just a copy of _DpuWaitForFence, just because we are not the DPU here.
-            avxFence fenc = ctrl->wait;
             GLsync glHandle = AfxLoadAtomPtr(&fenc->glHandleAtom);
 
             if (glHandle)
             {
                 AFX_ASSERT(gl->IsSync(glHandle));
                 //AFX_ASSERT(fenc->glHandle == glHandle);
-                gl->WaitSync(glHandle, GL_NONE, GL_TIMEOUT_IGNORED);
+                //gl->WaitSync(glHandle, GL_NONE, GL_TIMEOUT_IGNORED);
             }
         }
+    }
 
+    avxRaster buf;
+    AvxGetSurfaceBuffer(dout, bufIdx, &buf);
+    AFX_ASSERT_OBJECTS(afxFcc_RAS, 1, &buf);
+#if 0
+    avxCanvas canv;
+    afxLayeredRect rc;
+    AvxGetSurfaceCanvas(dout, bufIdx, &canv, &rc);
+    AFX_ASSERT_OBJECTS(afxFcc_CANV, 1, &canv);
+#endif
+
+    if (buf->glHandle)
+    {
         if (!dout->wgl.swaps[bufIdx].swapFboReady)
         {
             // deferred regen because we need a context.
@@ -143,19 +524,21 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
             gl->BindFramebuffer(GL_READ_FRAMEBUFFER, dout->wgl.swaps[bufIdx].swapFbo); _ZglThrowErrorOccuried();
         }
 
+        static GLbitfield const clearBitmask = GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT*/;
         static GLenum const invBufs[] =
         {
             GL_COLOR,
             GL_DEPTH,
             GL_STENCIL
         };
-        static GLbitfield const clearBitmask = GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT*/;
 
-        //gl->InvalidateFramebuffer(GL_DRAW_FRAMEBUFFER, ARRAY_SIZE(invBufs), invBufs); _ZglThrowErrorOccuried();
         gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried();
-        //gl->InvalidateFramebuffer(GL_DRAW_FRAMEBUFFER, ARRAY_SIZE(invBufs), invBufs); _ZglThrowErrorOccuried();
+#ifdef _INVALIDATE_BUFFERS
+        gl->InvalidateFramebuffer(GL_DRAW_FRAMEBUFFER, /*ARRAY_SIZE(invBufs)*/ 1, invBufs); _ZglThrowErrorOccuried();
+#endif//_INVALIDATE_BUFFERS
+
 #ifndef _CLEAR_BUFFERS_WITH_COLOR
-        gl->Clear(clearBitmask);  _ZglThrowErrorOccuried();
+        //gl->Clear(clearBitmask);  _ZglThrowErrorOccuried();
 #else
         gl->ClearBufferfv(GL_COLOR, /*GL_DRAW_BUFFER0 +*/ 0,
             (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE)) ?  AFX_V4D_ZERO : 
@@ -168,6 +551,8 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 #endif//_CLEAR_BUFFERS_WITH_COLOR
 
         avxVideoTransform xforms = dout->m.presentTransform;
+        
+        afxLayeredRect rc = dout->m.swaps[bufIdx].bounds;
 
         afxInt x = (xforms & avxVideoTransform_MIRROR) ? rc.area.w : 0;
         afxInt y = (xforms & avxVideoTransform_FLIP) ? rc.area.h : 0;
@@ -296,8 +681,100 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
 
         //gl->BlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, GL_NEAREST); _ZglThrowErrorOccuried();
 
-        if (ctrl->signal)
+#ifdef _UNBIND_BLIT_SRC_FBO
+        gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
+#endif//_UNBIND_BLIT_SRC_FBO
+#ifdef _UNBIND_BLIT_DST_FBO
+        gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
+#endif//_UNBIND_BLIT_DST_FBO
+#ifdef _FLUSH_AFTER_BLIT_FBO
+        gl->Flush();
+#endif//_FLUSH_AFTER_BLIT_BUFFERS
+
+#if _SWAP_BUFFERS_WITH_HINT
+        if (ctrl->hintCnt)
         {
+            /*
+                The glAddSwapHintRectWIN callback function specifies a set of rectangles that are to be copied by SwapBuffers.
+
+                void WINAPI glAddSwapHintRectWIN(GLint x, GLint y, GLsizei width, GLsizei height);
+
+                The glAddSwapHintRectWIN function speeds up animation by reducing the amount of repainting between frames. 
+                With glAddSwapHintRectWIN, you specify a set of rectangular areas that you want copied when you call SwapBuffers. 
+                When you do not specify any rectangles with glAddSwapHintRectWIN before calling SwapBuffers, the entire framebuffer is swapped. 
+                Using glAddSwapHintRectWIN to copy only changed parts of the buffer can significantly increase the performance of SwapBuffers, 
+                especially when SwapBuffers is implemented in software.
+
+                The glAddSwapHintRectWIN function adds a rectangle to the hint region. 
+                When the PFD_SWAP_COPY flag of the PIXELFORMATDESCRIPTOR pixel format structure is set, 
+                SwapBuffers uses this region to clip the copying of the back buffer to the front buffer. 
+                You don't specify PFD_SWAP_COPY; it is set by capable hardware. The hint region is cleared after each call to SwapBuffers. 
+                With some hardware configurations, SwapBuffers can ignore the hint region and exchange the entire buffer. 
+                SwapBuffers is implemented by the system, not by the application.
+
+                OpenGL maintains a separate hint region for each window. 
+                When you call glAddSwapHintRectWIN on any rendering contexts associated with a window, 
+                the hint rectangles are combined into a single region.
+
+                Call glAddSwapHintRectWIN with a bounding rectangle for each object drawn for a frame and for each rectangle cleared to erase previous frame objects.
+            */
+
+            if (dout->wgl.AddSwapHintRectWIN)
+            {
+                for (afxUnit i = 0; i < ctrl->hintCnt; i++)
+                {
+                    afxRect rc;
+                    if (AfxIntersectRects(&rc, &dout->m.area, &ctrl->hintRcs[i]))
+                    {
+                        dout->wgl.AddSwapHintRectWIN(rc.x, rc.y, rc.w, rc.h); _ZglThrowErrorOccuried();
+                    }
+                }
+            }
+        }
+#endif//_SWAP_BUFFERS_WITH_HINT
+
+#ifndef _NEVER_FLUSH_DWM
+#ifndef _ALWAYS_FLUSH_DWM
+        if (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE))
+#endif//_ALWAYS_FLUSH_DWM
+        {
+#ifndef _ALWAYS_FLUSH_DWM_FSE
+            if (!dout->m.fse)
+#endif//_ALWAYS_FLUSH_DWM_FSE
+            {
+                /*
+                    DwmFlush waits for any queued DirectX changes that were queued by the calling application to be drawn to 
+                    the screen before returning. It does not flush the entire session rendering batch.
+                    This is why it is used before SwapBuffers.
+                */
+                DwmFlush();
+            }
+        }
+#endif//_NEVER_FLUSH_DWM
+
+#ifdef _SWAP_BUFFERS_WITH_WGL
+
+        if (dout->wgl.swapOnWgl)
+        {
+            wglSwapBuffersWIN(dout->hDC);
+        }
+        else
+#endif//_SWAP_BUFFERS_WITH_WGL
+        {
+            SwapBuffers(dout->hDC);
+        }
+    }
+
+    if (ctrl->signal)
+    {
+        avxFence fenc = ctrl->signal;
+        AvxSignalFence(fenc, ctrl->signalValue);
+#if 0
+        afxUnit64 oldVal = 0;
+        if (ctrl->signalValue > (oldVal = (afxUnit64)AfxLoadAtom64(&fenc->m.value)))
+        {
+            AvxSignalFence(fenc, ctrl->signalValue);
+#if 0
             // Just a copy of _DpuSignalFence, just because we are not the DPU.
             avxFence fenc = ctrl->signal;
             GLsync glHandle = gl->FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -311,39 +788,9 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
             }
             // We are not a DPU, we have to busy-wait if needed.
             //AfxPushLink(&fenc->onSignalChain, &dpu->fenceSignalChain);
+#endif
         }
-
-#ifdef _UNBIND_BLIT_SRC_FBO
-        gl->BindFramebuffer(GL_READ_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
-#endif//_UNBIND_BLIT_SRC_FBO
-#ifdef _UNBIND_BLIT_DST_FBO
-        gl->BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); _ZglThrowErrorOccuried(); _ZglThrowErrorOccuried();
-#endif//_UNBIND_BLIT_DST_FBO
-#ifdef _FLUSH_AFTER_BLIT_FBO
-        gl->Flush();
-#endif//_FLUSH_AFTER_BLIT_BUFFERS
-#ifdef _SWAP_BUFFERS_WITH_WGL
-        if (dout->wgl.swapOnWgl)
-        {
-            wglSwapBuffersWIN(dout->hDC);
-        }
-        else
-#endif//_SWAP_BUFFERS_WITH_WGL
-        {
-            SwapBuffers(dout->hDC);
-        }
-
-#ifndef _NEVER_FLUSH_DWM
-#ifndef _ALWAYS_FLUSH_DWM
-        if (dout->m.presentAlpha && (dout->m.presentAlpha != avxVideoAlpha_OPAQUE))
-#endif//_ALWAYS_FLUSH_DWM
-        {
-#ifndef _ALWAYS_FLUSH_DWM_FSE
-            if (!dout->m.fse)
-#endif//_ALWAYS_FLUSH_DWM_FSE
-                DwmFlush();
-        }
-#endif//_NEVER_FLUSH_DWM
+#endif
     }
 
 #ifndef _NEVER_RESTORE_WGL_CONTEXT
@@ -351,7 +798,10 @@ _QOW afxError _ZglDoutPresent_WGL(afxDrawQueue dque, avxPresentation* ctrl)
     if (mustRestoreCtx)
 #endif//_ALWAYS_UNBIND_WGL_CONTEXT
     {
-        wglMakeCurrentWIN(bkpHdc, bkpGlrc);
+        if (!wglMakeCurrentWIN(bkpHdc, bkpGlrc))
+        {
+            AfxThrowError();
+        }
     }
 #endif//_NEVER_RESTORE_WGL_CONTEXT
 
@@ -721,6 +1171,7 @@ _QOW afxError _DpuPresentDout(zglDpu* dpu, afxSurface dout, afxUnit outBufIdx)
 }
 #endif
 
+#if 0
 _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
 {
     afxError err = { 0 };
@@ -738,8 +1189,6 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
 
     if (dout->wgl.hSwapRC)
     {
-        afxDrawSystem currDsys = AvxGetSurfaceHost(dout);
-
         HDC bkpHdc = wglGetCurrentDCWIN();
         HGLRC bkpGlrc = wglGetCurrentContextWIN();
 
@@ -784,7 +1233,7 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
         {
             { WGL_SUPPORT_OPENGL_ARB, GL_TRUE }, // suportar o que se não OpenGL na fucking API do OpenGL???
             { WGL_DRAW_TO_WINDOW_ARB, GL_TRUE },
-#if 0
+#ifdef _FORCE_DISABLE_WGL_INTEROPS
             { WGL_SUPPORT_GDI_ARB, GL_FALSE },
             { WGL_DRAW_TO_PBUFFER_ARB, GL_FALSE },
             { WGL_DRAW_TO_BITMAP_ARB, GL_FALSE },
@@ -792,9 +1241,17 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
             { WGL_BIND_TO_TEXTURE_RGBA_ARB, GL_FALSE },
 #endif
             { WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB },
+#ifdef _ALLOW_SINGLE_BUFFER
+            { WGL_DOUBLE_BUFFER_ARB, (dout->swapCnt > 1) }, // single buffered is not supported by drivers today. Qwadro will just virtualizes it.
+#else
             { WGL_DOUBLE_BUFFER_ARB, GL_TRUE }, // single buffered is not supported by drivers today. Qwadro will just virtualizes it.
+#endif
+#ifdef _ALLOW_FLOAT_TYPE_BUFFER
+            { WGL_PIXEL_TYPE_ARB, (pfd.type[0] == avxFormatType_F) ? WGL_TYPE_RGBA_FLOAT_ARB : WGL_TYPE_RGBA_ARB },
+#else
             { WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB },
-#if 0
+#endif
+#ifdef _FORCE_SWAP_METHOD_EXCHANGE
             /*
                 WGL_SWAP_METHOD_ARB
                 If the pixel format supports a back buffer, then this indicates
@@ -832,11 +1289,11 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
             { WGL_GREEN_SHIFT_ARB, pfd.swizzle[1] },
             { WGL_BLUE_SHIFT_ARB, pfd.swizzle[2] },
 #endif
-#if 0
+#ifdef _FORCE_DISABLE_DEPTH_BUFFERS
             { WGL_DEPTH_BITS_ARB, 0 }, // No Qwadro, não é possível desenhar arbitrariamente no default framebuffer. Logo, não há necessidade de stencil.
             { WGL_STENCIL_BITS_ARB, 0 },  // No Qwadro, não é possível desenhar arbitrariamente no default framebuffer. Logo, não há necessidade de stencil.
 #endif
-#if 0
+#ifdef _FORCE_DISABLE_AUX_BUFFERS
             { WGL_AUX_BUFFERS_ARB, dout->m.bufCnt },
             { WGL_ACCUM_BITS_ARB, 0 },
             { WGL_ACCUM_ALPHA_BITS_ARB, 0 },
@@ -886,7 +1343,7 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
             // and possibly usable via Direct3D as well — it's a driver hint, not a directive.
             //dout->wglDcPxlFmt = _ZglChoosePixelFormat(dout->wglDc, &(pfd));
             DWORD pfdFlags = PFD_DOUBLEBUFFER | PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL
-#if 0
+#ifdef _FORCE_SWAP_METHOD_EXCHANGE
                 | PFD_SWAP_EXCHANGE
 #endif
 #if 0
@@ -949,6 +1406,24 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
             //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
 #endif
             
+            /*
+                wglSwapIntervalEXT(0) disables VSync.
+                The GPU is allowed to present frames as fast as it can, without waiting for the monitor's refresh.
+                Result:
+                    Maximum FPS
+                    Possible screen tearing
+                    Lowest input latency (unless GPU is overloaded)
+
+                wglSwapIntervalEXT(-1) requests "Adaptive VSync" (supported only by NVIDIA drivers).
+                Behavior:
+                    When FPS >= monitor refresh rate -> VSync ON, no tearing.
+                    When FPS < monitor refresh rate -> VSync OFF, reduces stutter from VSync stalls.
+                Result:
+                    Less stuttering than traditional VSync when FPS dips.
+                    Can still tear during low-FPS periods.
+                    Works only if the driver supports adaptive VSync via the extension.
+            */
+
             AFX_ASSERT(_WGL_EXT_swap_control);
             if (_WGL_EXT_swap_control)
             {
@@ -961,27 +1436,19 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
                 }
                 else
                 {
-#if !0
+#ifndef _ALLOW_TEARING_CONTROL
                     // When tested on Intel iGPU, wglSwapIntervalEXT(-1) seem to be disallowing tearing.
                     // But I need to profile it.
                     wglSwapIntervalEXT(0);
 #else
-                    if ((dout->m.presentMode & avxPresentFlag_NO_TEARING) || !_WGL_EXT_swap_control_tear)
+                    if ((dout->m.presentMode & avxPresentFlag_NO_TEARING) && _WGL_EXT_swap_control_tear)
                     {
-                        // It disables vsync (immediate swapping).
-                        wglSwapIntervalEXT(0);
+                        wglSwapIntervalEXT(-1);
                     }
                     else
                     {
-                        // It disables vsync but allows tearing.
-                        // Rendering isn't delayed to sync with the display, but tearing artifacts may appear.
-                        // Useful for benchmarking or reducing input latency.
-
-                        // Useful when:
-                        // we're writing a real-time or low-latency app (like a game or VR);
-                        // we want uncapped framerates for benchmarking;
-                        // we're okay with screen tearing (e.g., for input latency testing);
-                        wglSwapIntervalEXT(-1);
+                        // It disables vsync (immediate swapping).
+                        wglSwapIntervalEXT(0);
                     }
 #endif
                 }
@@ -994,6 +1461,7 @@ _QOW afxError _ZglRelinkDoutCb_WGL(afxSurface dout)
     wglMakeCurrentWIN(bkpHdc, bkpGlrc);
     return err;
 }
+#endif
 
 void _ZglPlaceWindowedSurfaceW32(HWND hwnd, afxRect const* rect)
 {
@@ -1109,13 +1577,18 @@ _QOW afxError _ZglDoutAdjust_WGL(afxSurface dout, afxRect const* area, afxBool f
 {
     afxError err = { 0 };
 
-    _AvxDoutImplAdjustCb(dout, area, fse);
+    _AvxDoutAdjustCb(dout, area, fse);
+
+    return err;
+}
+
+_QOW afxError _ZglDoutImplRegenBuffers(afxSurface dout, afxBool build)
+{
+    _AvxDoutRegenBuffers(dout, build);
 
     if (dout->wgl.swaps)
         for (afxUnit i = 0; i < dout->m.swapCnt; i++)
             dout->wgl.swaps[i].swapFboReady = FALSE;
-
-    return err;
 }
 
 _QOW afxError _ZglDoutIoctl_WGL(afxSurface dout, afxUnit code, va_list ap)
@@ -1144,9 +1617,9 @@ _QOW _avxDdiDout const _ZGL_DDI_DOUT =
 {
     .ioctlCb = _ZglDoutIoctl_WGL,
     .adjustCb = _ZglDoutAdjust_WGL,
-    .regenCb = _AvxDoutImplRegenBuffers,
-    .lockCb = _AvxDoutImplLockBufferCb,
-    .unlockCb = _AvxDoutImplUnlockBufferCb,
+    .regenCb = _ZglDoutImplRegenBuffers,
+    .lockCb = _AvxDoutLockBufferCb,
+    .unlockCb = _AvxDoutUnlockBufferCb,
     .presentCb = _ZglDoutPresent_WGL,
     .presOnDpuCb = (void*)_DpuPresentDout_BlitSwapFbo
 };
@@ -1177,7 +1650,7 @@ _QOW afxError _ZglDoutDtorCb(afxSurface dout)
     if (dout->hDC)
         ReleaseDC(dout->hWnd, dout->hDC);
 
-    if (_AVX_DOUT_CLASS_CONFIG.dtor(dout))
+    if (_AVX_CLASS_CONFIG_DOUT.dtor(dout))
         AfxThrowError();
 
     return err;
@@ -1193,7 +1666,7 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
     afxSurfaceConfig const* cfg = ((afxSurfaceConfig const *)args[1]) + invokeNo;
     AFX_ASSERT(cfg);
 
-    if (_AVX_DOUT_CLASS_CONFIG.ctor(dout, (void*[]) { dsys, (void*)cfg }, 0))
+    if (_AVX_CLASS_CONFIG_DOUT.ctor(dout, (void*[]) { dsys, (void*)cfg }, 0))
     {
         AfxThrowError();
         return err;
@@ -1203,15 +1676,19 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
 
     dout->hInst = cfg->iop.w32.hInst;
     dout->hWnd = cfg->iop.w32.hWnd;
-    dout->hDC = NIL;
+    dout->hDC = GetDC(dout->hWnd);
     dout->dcPixFmt = 0;
     dout->isWpp = FALSE;
     dout->wgl.hSwapRC = NIL;
     dout->wgl.swapOnWgl = TRUE;
     dout->wgl.swaps = NIL;
-    
+
     if (AfxAllocate(dout->m.swapCnt * sizeof(dout->wgl.swaps[0]), 0, AfxHere(), (void**)&dout->wgl.swaps))
+    {
         AfxThrowError();
+        _AVX_CLASS_CONFIG_DOUT.dtor(dout);
+        return err;
+    }
 
     for (afxUnit i = 0; i < dout->m.swapCnt; i++)
     {
@@ -1219,13 +1696,76 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
         dout->wgl.swaps[i].swapFboReady = FALSE;
     }
 
-    if (_ZglRelinkDoutCb_WGL(dout))
+    _QowDoutFindPixelFormat(dout);
+
+    HDC bkpHdc = wglGetCurrentDCWIN();
+    HGLRC bkpGlrc = wglGetCurrentContextWIN();
+    glVmt const* gl;
+
+    if (wglCreateContextSIGMA(dout->hDC, dsys->hPrimeRC, dsys->glVerMaj, dsys->glVerMin, FALSE, dsys->robustCtx, FALSE, &dout->wgl.hSwapRC, NIL, FALSE))
+    {
         AfxThrowError();
+    }
+    else
+    {
+        dout->wgl.gl = &dsys->gl;
+        gl = dout->wgl.gl;
+
+        if (!wglMakeCurrentWIN(dout->hDC, dout->wgl.hSwapRC))
+        {
+            AfxThrowError();
+        }
+        else
+        {
+#if _AFX_DEBUG
+            gl->Enable(GL_DEBUG_OUTPUT);
+            gl->Enable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+            gl->DebugMessageCallback(_glDbgMsgCb, NIL);
+            //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
+#endif
+
+            _QowDoutUpdateSwapControl(dout);
+        }
+
+        if (err)
+        {
+            wglDeleteContextWIN(dout->wgl.hSwapRC);
+            dout->wgl.hSwapRC = NIL;
+        }
+    }
+
+    wglMakeCurrentWIN(bkpHdc, bkpGlrc);
+
+    avxRange const screenRes =
+    {
+        GetDeviceCaps(dout->hDC, HORZRES),
+        GetDeviceCaps(dout->hDC, VERTRES),
+        GetDeviceCaps(dout->hDC, PLANES)
+    };
+
+    afxReal64 physAspRatio = (afxReal64)GetDeviceCaps(dout->hDC, HORZSIZE) / (afxReal64)GetDeviceCaps(dout->hDC, VERTSIZE);
+    afxReal refreshRate = GetDeviceCaps(dout->hDC, VREFRESH);
+
+    avxModeSetting mode = { 0 };
+    AvxQuerySurfaceMode(dout, &mode);
+    mode.refreshRate = refreshRate;
+    mode.wpOverHp = physAspRatio;
+    mode.resolution = screenRes;
+    AvxResetSurfaceMode(dout, &mode);
 
     HWND hWnd = cfg->iop.w32.hWnd;
 
     if (hWnd)
     {
+#if _SWAP_BUFFERS_WITH_HINT
+        if (glHasExtensionSIG(gl, "GL_WIN_swap_hint"))
+            dout->wgl.AddSwapHintRectWIN = NIL;
+        else
+        {
+            void(*WINAPI AddSwapHintRectWIN)(GLint x, GLint y, GLsizei width, GLsizei height) = (void*)wglGetProcAddressWIN("glAddSwapHintRectWIN");
+            dout->wgl.AddSwapHintRectWIN = AddSwapHintRectWIN;
+        }
+#endif
 
         // fetch capabilities of the visual display unit.
 #if 0
@@ -1318,7 +1858,7 @@ _QOW afxError _ZglDoutCtorCb(afxSurface dout, void** args, afxUnit invokeNo)
 #endif
     }
 
-    if (err && _AVX_DOUT_CLASS_CONFIG.dtor(dout))
+    if (err && _AVX_CLASS_CONFIG_DOUT.dtor(dout))
         AfxThrowError();
 
     return err;

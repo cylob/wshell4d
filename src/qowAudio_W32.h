@@ -26,17 +26,17 @@
 #include <Windows.h>
 #include "qowBase.h"
 #define _AMX_MIX_C
-#define _AVX_DISPLAY_C
-#define _AVX_DISPLAY_IMPL
+#define _AUX_DISPLAY_C
+#define _AUX_DISPLAY_IMPL
 #define _AMX_SINK_C
 #define _AMX_SINK_IMPL
 #define _AMX_AUDIO_C
 //#define _AMX_BUFFER_IMPL
-#include "../qwadro_afx/src/mix/amxIcd.h"
+#include "../qwadro_afx/mixva/amxIcd.h"
 #include "../../icd_amiga/src/zalBase.h"
 #include "../../icd_amiga/src/zalInteropWasapi.h"
 #define _AUX_UX_C
-#include "../qwadro_afx/src/ux/auxIcd.h"
+#include "../qwadro_afx/mmux/auxIcd.h"
 
 AFX_OBJECT(afxSink)
 {
@@ -54,7 +54,7 @@ AFX_OBJECT(afxSink)
 };
 
 
-QOW afxError _QowAsioCtorCb(afxSink asi, void** args, afxUnit invokeNo);
-QOW afxError _QowAsioDtorCb(afxSink asi);
+QOW afxError _QowSinkCtorCb(afxSink asi, void** args, afxUnit invokeNo);
+QOW afxError _QowSinkDtorCb(afxSink asi);
 
 #endif//QOW_AUDIO_H

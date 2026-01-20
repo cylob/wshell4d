@@ -266,6 +266,7 @@ _QOW afxError CopyIntoClipboard(afxEnvironment env, afxUnit slot, afxFlags flags
         SetClipboardData(CF_UNICODETEXT, stringHandle);
     }
     CloseClipboard();
+    return FALSE;
 }
 
 _QOW afxBool HasClipboardContent(afxEnvironment env, afxUnit slot, afxFlags flags)
@@ -278,6 +279,7 @@ _QOW afxBool HasClipboardContent(afxEnvironment env, afxUnit slot, afxFlags flag
         AfxThrowError();
         return err;
     }
+    return FALSE;
 }
 
 _QOW afxError CopyOutClipboard(afxEnvironment env, afxUnit slot, afxFlags flags, afxString* buf)
@@ -377,6 +379,7 @@ _QOW afxError _QowPromoteWindow(afxEnvironment env, afxWindow wnd)
 
         FlashWindowEx(&info);
     }
+    return err;
 }
 
 _QOW afxBool getMousePosition(afxEnvironment env, afxRect* rc, afxWindow wnd, afxRect* onFrame, afxRect* onSurface)

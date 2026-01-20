@@ -197,7 +197,7 @@ _QOW afxError _QowDoutAdjustCb_GDI(afxSurface dout, afxRect const* area, afxBool
 {
     afxError err = { 0 };
 
-    _AvxDoutImplAdjustCb(dout, area, fse);
+    _AvxDoutAdjustCb(dout, area, fse);
 
     return err;
 }
@@ -360,8 +360,8 @@ _QOW _avxDdiDout const _QOW_DDI_DOUT =
 {
     .ioctlCb = _QowDoutIoctlCb_GDI,
     .adjustCb = _QowDoutAdjustCb_GDI,
-    .lockCb = _AvxDoutImplLockBufferCb,
-    .unlockCb = _AvxDoutImplUnlockBufferCb,
+    .lockCb = _AvxDoutLockBufferCb,
+    .unlockCb = _AvxDoutUnlockBufferCb,
     .presentCb = _QowDoutPresentCb_GDI,
     .regenCb = _QowDoutRegenerateCb_GDI
 };
@@ -388,7 +388,7 @@ _QOW afxError _QowDoutDtorCb_GDI(afxSurface dout)
     if (dout->hDC)
         ReleaseDC(dout->hWnd, dout->hDC);
 
-    if (_AVX_DOUT_CLASS_CONFIG.dtor(dout))
+    if (_AVX_CLASS_CONFIG_DOUT.dtor(dout))
         AfxThrowError();
 
     return err;
@@ -404,7 +404,7 @@ _QOW afxError _QowDoutCtorCb_GDI(afxSurface dout, void** args, afxUnit invokeNo)
     afxSurfaceConfig const* cfg = ((afxSurfaceConfig const *)args[1]) + invokeNo;
     AFX_ASSERT(cfg);
 
-    if (_AVX_DOUT_CLASS_CONFIG.ctor(dout, (void*[]) { dsys, (void*)cfg }, 0))
+    if (_AVX_CLASS_CONFIG_DOUT.ctor(dout, (void*[]) { dsys, (void*)cfg }, 0))
     {
         AfxThrowError();
         return err;
@@ -434,7 +434,7 @@ _QOW afxError _QowDoutCtorCb_GDI(afxSurface dout, void** args, afxUnit invokeNo)
 
     HWND hWnd = cfg->iop.w32.hWnd;
 
-    if (err && _AVX_DOUT_CLASS_CONFIG.dtor(dout))
+    if (err && _AVX_CLASS_CONFIG_DOUT.dtor(dout))
         AfxThrowError();
 
     return err;
